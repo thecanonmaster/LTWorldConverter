@@ -12,9 +12,11 @@ type
   private
     FCurDir: string;
     FSeparator: Char;
+    FDumpsDir: string;
   public
     property Dir: string read FCurDir write FCurDir;
     property Sep: Char read FSeparator write FSeparator;
+    property DumpsDir: string read FDumpsDir write FDumpsDir;
     constructor Create;
     destructor Destroy; override;
     function FileExists(Filename: string): boolean;
@@ -47,6 +49,7 @@ begin
   {$ELSE}
   FSeparator := '\';
   {$ENDIF}
+  FDumpsDir := FCurDir + FSeparator + 'dumps';
 end;
 
 destructor TMyCrossPlatform.Destroy;

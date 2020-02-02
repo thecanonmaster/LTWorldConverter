@@ -24,20 +24,20 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="-f DM_Verloc.DAT -g poly -b avp2 -i"/>
+        <CommandLineParams Value="-f a1s2.dat -g simple -l"/>
         <Display Value=""/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="-f DM_Verloc.DAT -g poly -b avp2 -i"/>
+            <CommandLineParams Value="-f a1s2.dat -g simple -l"/>
             <Display Value=""/>
           </local>
         </Mode0>
       </Modes>
     </RunParams>
-    <Units Count="8">
+    <Units Count="9">
       <Unit0>
         <Filename Value="LTWorldConv.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -71,6 +71,10 @@
         <Filename Value="globals.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit7>
+      <Unit8>
+        <Filename Value="lightmapcompress.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit8>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

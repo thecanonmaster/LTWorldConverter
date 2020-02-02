@@ -9,9 +9,6 @@ uses
   Classes, SysUtils, CustApp, MyCrossPlatform,
   MyLogger, ltworldreader, ltaworldexporter, globals;
 
-const
-  LTWC_VERSION = 'v0.11 alpha';
-
 type
   TLTWorldConv = class(TCustomApplication)
   private
@@ -30,20 +27,33 @@ var Filename: string;
     //LTAFilename: string;
     WorldReader: TLTWorldReader;
     LTAExporter: TLTAWorldExporter;
-    szBrushType: string;
-    szBrushGenType: string;
-    bDumpNodes: Boolean;
-    bIgnoreObjects: Boolean;
+    szLogLevel: string;
 begin
   CreateDir(CPData.Dir + CPData.Sep + 'dumps');
 
   FormatSettings.DecimalSeparator := '.';
   Filename := GetOptionValue('f', '');
   //LTAFilename := GetOptionValue('e', '');
-  szBrushType := GetOptionValue('b', '');
-  szBrushGenType := GetOptionValue('g', '');
-  bDumpNodes := HasOption('d', '');
-  bIgnoreObjects := HasOption('i', '');
+  g_szBrushType := GetOptionValue('b', '');
+  g_szBrushGenType := GetOptionValue('g', '');
+  g_szGeometrySource := GetOptionValue('s', '');
+  g_bDumpNodes := HasOption('d', '');
+  g_bIgnoreObjects := HasOption('i', '');
+  g_bReadLightAnims := HasOption('l', '');
+
+  if HasOption('o', '') then
+  begin
+    szLogLevel := GetOptionValue('o', '');
+    try
+      Logger.RootLevel := StrToInt(szLogLevel);
+    except on E: EConvertError do
+      Logger.RootLevel := LM_WARN;
+    end;
+  end
+  else
+  begin
+    Logger.RootLevel := LM_WARN;
+  end;
 
   if Filename = '' then
   begin
@@ -55,18 +65,25 @@ begin
     WriteLn('   -e: Output LTA world file. Can be read by AVP2 and NOLF2 DEdits.');
     WriteLn('   -b: Brush type (avp2 or nolf2). For AVP2 or NOLF2.');
     WriteLn('   -g: Brush generation type (simple or poly). For each worldmodel or for each poly.');
-    WriteLn('   -d: Dump BSP structures.');
+    WriteLn('   -d: Dump BSP nodes.');
+    WriteLn('   -s: Main geometry source (physics, vis or both).');
     //WriteLn('   -i: Do not include objects into LTA world file.');
+    WriteLn('   -l: Read lightanims and save to disk.');
+    WriteLn('   -o: Log level 0 - 3 (INFO - DEBUG).');
   end;
   //if not CPData.FileExists(LTAFilename) then LTAFilename := 'world.lta';
-  if (szBrushType <> 'nolf2') and (szBrushType <> 'avp2') then szBrushType := 'avp2';
-  if (szBrushGenType <> 'simple') and (szBrushGenType <> 'poly') then szBrushGenType := 'poly';
+  if (g_szBrushType <> 'nolf2') and (g_szBrushType <> 'avp2') then g_szBrushType := 'avp2';
+
+  if (g_szBrushGenType <> 'simple') and (g_szBrushGenType <> 'poly') then g_szBrushGenType := 'poly';
+
+  if (g_szGeometrySource <> 'physics') and (g_szGeometrySource <> 'vis') and (g_szGeometrySource <> 'both')
+    then g_szGeometrySource := 'physics';
 
   if (CPData.FileExists(Filename)) then
   begin
-    WorldReader := TLTWorldReader.Create(Filename, bDumpNodes);
+    WorldReader := TLTWorldReader.Create(Filename);
     WorldReader.ReadWorld;
-    LTAExporter := TLTAWorldExporter.Create(WorldReader, szBrushType, szBrushGenType, bIgnoreObjects);
+    LTAExporter := TLTAWorldExporter.Create(WorldReader);
     LTAExporter.ExportText(Filename + '.lta');
     LTAExporter.Free;
     WorldReader.Free;

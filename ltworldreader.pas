@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, ltworldtypes, ltworldobject, contnrs, ltworldtree,
-  ltworlddata, globals, MyLogger;
+  ltworlddata, globals, MyLogger, lightmapcompress;
 
 type
 
@@ -21,12 +21,12 @@ type
     WorldObjectList: TWorldObjectList;
     WorldTree: TLTWorldTree;
     WorldModelList: TWorldModelList;
+    WorldLMAnimList: TWorldLMAnimList;
 
     // other
     m_szFilename: string;
     //m_pFileStream: TFileStream;
     m_pMemoryStream: TMemoryStream;
-    m_bDumpNodes: Boolean;
 
     // routines
     procedure ReadHeader;
@@ -34,11 +34,17 @@ type
     procedure ReadWorldTree;
     procedure ReadObjects;
     procedure ReadWorldModels;
-    //procedure ReadTemp;
+    procedure ReadRenderData;
+
+    procedure AssignWorldPolyToLMPolyRef(pPolyRef: TLMPolyRef);
+    procedure AssignWidthAndHeightToLMFrame(pAnim: TLMAnim; nIndex: Cardinal;
+      pFrame: TLMFrame);
 
   protected
   public
     procedure ReadWorld;
+    procedure RemoveWorldModel(szName: string);
+    procedure MoveWorldModel(szName: string; nToIndex: Integer);
 
     property Header: TWorldHeader read WorldHeader write WorldHeader;
     property Properties: string read WorldProperties write WorldProperties;
@@ -46,16 +52,16 @@ type
     property ObjectList: TWorldObjectList read WorldObjectList write WorldObjectList;
     property Tree: TLTWorldTree read WorldTree write WorldTree;
     property ModelList: TWorldModelList read WorldModelList write WorldModelList;
+    property LMAnimList: TWorldLMAnimList read WorldLMAnimList write WorldLMAnimList;
 
-    constructor Create(szFileName: string; bDumpNodes: Boolean); virtual;
+    constructor Create(szFileName: string); virtual;
     destructor Destroy; override;
   end;
 
 implementation
 
-constructor TLTWorldReader.Create(szFileName: string; bDumpNodes: Boolean);
+constructor TLTWorldReader.Create(szFileName: string);
 begin
-  m_bDumpNodes := bDumpNodes;
   m_szFilename := szFileName;
   WLogStr('LTWorldReader created: ' + m_szFilename);
   //m_pFileStream := TFileStream.Create(m_szFilename, fmOpenRead);
@@ -64,6 +70,7 @@ begin
   //m_pFileStream.Free;
   WorldObjectList.pObjectList := TFPObjectList.Create(True);
   WorldModelList.pModelList := TFPObjectList.Create(True);
+  WorldLMAnimList.pLMAnimList := TFPObjectList.Create(True);
 end;
 
 destructor TLTWorldReader.Destroy;
@@ -260,8 +267,8 @@ begin
     end;
 
     // save to file
-    if m_bDumpNodes then
-      pWorldBSP.SaveNodesDump(CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + pWorldBSP.WorldName + '.ltnd');
+    if g_bDumpNodes then
+      pWorldBSP.SaveNodesDump(CPData.DumpsDir + CPData.Sep + pWorldBSP.WorldName + '.ltnd');
 
     if pWorldBSP.Planes > 0 then
     for j := 0 to pWorldBSP.Planes - 1 do
@@ -312,7 +319,8 @@ begin
 
       WLogVec('| | Center', @pWorldPoly.Center);
       //WLogReal('| | Radius', pWorldPoly.Radius);
-      WLogInt('| | UnknownFlags', pWorldPoly.UnknownFlags);
+      WLogInt('| | LightmapWidth', pWorldPoly.LightmapWidth);
+      WLogInt('| | LightmapHeight', pWorldPoly.LightmapHeight);
       WLogInt('| | UnknownNum', pWorldPoly.UnknownNum);
 
       szDump := '';
@@ -359,12 +367,12 @@ begin
       WLogStr('| | ----------------------------------');
     end;
 
-    WLogStr('| | UnknownStruct after Nodes');
+    {WLogStr('| | UnknownStruct after Nodes');
     WLogInt('| | Cardinal1', pWorldBSP.UnknownStruct.n1);
     WLogInt('| | Cardinal2', pWorldBSP.UnknownStruct.n2);
     WLogInt('| | Cardinal3', pWorldBSP.UnknownStruct.n3);
     WLogVec('| | Vector1', @pWorldBSP.UnknownStruct.v1);
-    WLogVec('| | Vector2', @pWorldBSP.UnknownStruct.v2);
+    WLogVec('| | Vector2', @pWorldBSP.UnknownStruct.v2); }
 
     WLogStr('| ----------------------------------');
     m_pMemoryStream.Position := pWorldData.NextPos;
@@ -372,6 +380,192 @@ begin
 
   WLogStr('-----------------------------------');
   WLogStr('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
+end;
+
+procedure TLTWorldReader.ReadRenderData;
+var i, j, k, n: Cardinal;
+    anTempArray: TDynByteArray;
+    nTempCardinal: Cardinal = 0;
+    nBatches: Byte = 0;
+    nFrames: Word = 0;
+    pAnim: TLMAnim;
+    pPolyRef: TLMPolyRef;
+    pBatch: TLMBatch;
+    pFrame: TLMFrame;
+    pPolyData: TLMFramePolyData;
+    nNameLen: Word = 0;
+    szAnimName: string;
+    slAnimList: TStringList;
+begin
+  slAnimList := TStringList.Create;
+  SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
+
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(WorldLMAnimList.nNumLMAnims, 4);
+
+  if WorldLMAnimList.nNumLMAnims > 0 then
+  begin
+    for i := 0 to WorldLMAnimList.nNumLMAnims - 1 do
+    begin
+      pAnim := TLMAnim.Create;
+
+      // LMAnim, LMPolyRef, LMFrame, uchar, LMFramePolyData
+      m_pMemoryStream.Read(nNameLen, 2);
+      SetLength(szAnimName, nNameLen);
+      m_pMemoryStream.Read(szAnimName[1], nNameLen);
+      pAnim.Name := szAnimName;
+
+      m_pMemoryStream.Read(nTempCardinal, 4);
+      m_pMemoryStream.Read(nBatches, 1);
+      m_pMemoryStream.Read(nFrames, 2);
+
+      pAnim.Batches := nBatches;
+      pAnim.Frames := nFrames;
+
+      // Somekind of indices? LMPolyRef?
+      if pAnim.Frames > 0 then
+      begin
+        for j := 0 to pAnim.Frames - 1 do
+        begin
+          pPolyRef := TLMPolyRef.Create;
+          m_pMemoryStream.Read(pPolyRef.m_nModelIndex, 2);
+          m_pMemoryStream.Read(pPolyRef.m_nPolyIndex, 2);
+          AssignWorldPolyToLMPolyRef(pPolyRef);
+          pAnim.PolyRefsList.Add(pPolyRef);
+        end;
+      end;
+
+      if pAnim.Batches > 0 then
+      begin
+        for j := 0 to pAnim.Batches - 1 do
+        begin
+          pBatch := TLMBatch.Create;
+
+          // Main geometry lightmaps? LMFrame?
+          if pAnim.Frames > 0 then
+          begin
+            for k := 0 to pAnim.Frames - 1 do
+            begin
+              pFrame := TLMFrame.Create;
+              AssignWidthAndHeightToLMFrame(pAnim, k, pFrame);
+
+              m_pMemoryStream.Read(pFrame.m_nSize, 2);
+              // Skip zero length
+              if pFrame.m_nSize > 0 then
+              begin
+                SetLength(pFrame.m_anData, pFrame.m_nSize);
+                m_pMemoryStream.Read(pFrame.m_anData[0], pFrame.m_nSize);
+
+                pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray{%H-});
+                if pFrame.m_nDecSize <> pFrame.m_nWidth * pFrame.m_nHeight * 4 then
+                begin
+                  Logger.WLog(LM_WARN, Format('Discrepancy in LMFrame[%d] uncompressed size! Uncompressed: %d, Predicted: %d', [k, pFrame.m_nDecSize, pFrame.m_nWidth * pFrame.m_nHeight * 4]));
+                end;
+                SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
+                Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
+
+                // Test
+                //FillByte(anTempArray[0], 4096, 0);
+                //pFrame.m_nReSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
+                //SetLength(pFrame.m_anReData, pFrame.m_nReSize);
+                //Move(anTempArray[0], pFrame.m_anReData[0], pFrame.m_nReSize);
+
+                pFrame.SwapRB;
+
+                //if szAnimName = 'StarLightView_Pred1__SV' then
+                //  SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'LM_' + pAnim.Name + '_' + IntToStr(k) + '.tga', 4, True, False);
+              end;
+              pBatch.FramesList.Add(pFrame);
+
+            end;
+          end;
+
+          if WorldHeader.nVersion = 70 then
+          begin
+
+            // WorldModels vertex colors? LMFramePolyData?
+            if pAnim.Frames > 0 then
+            begin
+              for k := 0 to pAnim.Frames - 1 do
+              begin
+                pPolyData := TLMFramePolyData.Create;
+
+                m_pMemoryStream.Read(pPolyData.m_nVertices, 1);
+                if pPolyData.m_nVertices > 0 then
+                begin
+
+                  SetLength(pPolyData.m_anData, pPolyData.m_nVertices * 3);
+
+                  for n := 0 to pPolyData.m_nVertices - 1 do
+                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 0], 1); // R
+
+                  for n := 0 to pPolyData.m_nVertices - 1 do
+                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 1], 1); // G
+
+                  for n := 0 to pPolyData.m_nVertices - 1 do
+                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 2], 1); // B
+
+                  // Red
+                  {for n := 0 to pPolyData.m_nVertices - 1 do
+                  begin
+                    m_pMemoryStream.Read(pPolyData.m_anR[n], 1);
+                  end;
+                  // Green
+                  for n := 0 to pPolyData.m_nVertices - 1 do
+                  begin
+                    m_pMemoryStream.Read(pPolyData.m_anG[n], 1);
+                  end;
+                  // Blue
+                  for n := 0 to pPolyData.m_nVertices - 1 do
+                  begin
+                    m_pMemoryStream.Read(pPolyData.m_anB[n], 1);
+                  end; }
+
+                end;
+
+                //if szAnimName = 'StarLightView_Pred1__SV' then
+                //  SaveArrayToTGA(pPolyData.m_anData, pPolyData.m_nVertices, 1, CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'LMPD_' + pAnim.Name + '_' + IntToStr(k) + '.tga', 3, False, False);
+
+                pBatch.FramePolyDataList.Add(pPolyData);
+              end;
+            end;
+
+          end;
+
+          pAnim.BatchesList.Add(pBatch);
+        end;
+      end;
+
+      WorldLMAnimList.pLMAnimList.Add(pAnim);
+      slAnimList.Add(pAnim.Name);
+      pAnim.SaveBatchesOnDisk;
+
+    end;
+  end;
+
+  SetLength(anTempArray, 0);
+  slAnimList.SaveToFile(CPData.DumpsDir + CPData.Sep + 'LightAnimList.txt');
+  slAnimList.Free;
+  //m_pMemoryStream.SaveToFile('1output.dat');
+  //Sleep(50000);
+end;
+
+procedure TLTWorldReader.AssignWorldPolyToLMPolyRef(pPolyRef: TLMPolyRef);
+var pWorldModel: TLTWorldBsp;
+begin
+  pWorldModel := TLTWorldData(WorldModelList.pModelList.Items[pPolyRef.m_nModelIndex]).OriginalBSP;
+  pPolyRef.m_pWorldPoly := TLTWorldPoly(pWorldModel.PoliesList.Items[pPolyRef.m_nPolyIndex]);
+end;
+
+procedure TLTWorldReader.AssignWidthAndHeightToLMFrame(pAnim: TLMAnim; nIndex: Cardinal; pFrame: TLMFrame);
+var pPoly: TLTWorldPoly;
+begin
+  pPoly := TLMPolyRef(pAnim.PolyRefsList.Items[nIndex]).m_pWorldPoly;
+  pFrame.m_nWidth := pPoly.LightmapWidth;
+  pFrame.m_nHeight := pPoly.LightmapHeight;
 end;
 
 procedure TLTWorldReader.ReadWorld;
@@ -385,7 +579,43 @@ begin
 
   m_pMemoryStream.Position := WorldHeader.dwObjectDataPos;
   ReadObjects;
-  //ReadTemp;
+  if g_bReadLightAnims then
+  begin
+    m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
+    ReadRenderData;
+  end;
 end;
+
+procedure TLTWorldReader.RemoveWorldModel(szName: string);
+var i: Cardinal;
+    pModel: TLTWorldBsp;
+begin
+  for i := 0 to WorldModelList.nNumModels - 1 do
+  begin
+     pModel := TLTWorldData(WorldModelList.pModelList.Items[i]).OriginalBSP;
+     if pModel.WorldName = szName then
+     begin
+       WorldModelList.pModelList.Delete(i);
+       Dec(WorldModelList.nNumModels, 1);
+       Exit;
+     end;
+  end;
+end;
+
+procedure TLTWorldReader.MoveWorldModel(szName: string; nToIndex: Integer);
+var i: Cardinal;
+    pModel: TLTWorldBsp;
+begin
+  for i := 0 to WorldModelList.nNumModels - 1 do
+  begin
+     pModel := TLTWorldData(WorldModelList.pModelList.Items[i]).OriginalBSP;
+     if pModel.WorldName = szName then
+     begin
+       WorldModelList.pModelList.Move(i, nToIndex);
+       Exit;
+     end;
+  end;
+end;
+
 
 end.

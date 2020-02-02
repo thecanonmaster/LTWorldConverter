@@ -24,7 +24,6 @@ const
   NODE_POLYHEDRONLIST = ' polyhedronlist ';
   {begin}
     NODE_POLYHEDRON = ' polyhedron ';
-    PROP_BSPNAME = ' bspname ';
     PROP_COLOR2 = ' color';
     ARRAY_POINTLIST = ' pointlist ';
     NODE_POLYLIST = ' polylist ';
@@ -132,8 +131,7 @@ type
 
     m_nBrushType: Integer;
     m_nBrushGetType: Integer;
-
-    m_bIgnoreObjects: Boolean;
+    m_szMainGeometrySource: String;
 
     // generic data writers
     procedure WriteNodeStart(Level: Integer; ID: string; Name: string);
@@ -149,6 +147,7 @@ type
     procedure WriteWorldPoint(Level: Integer; Vector: PLTVector);
     procedure WriteArrayRotation(Level: Integer; ID: string; Rotation: PLTRotation);
     procedure WriteRotation(Level: Integer; Rotation: PLTRotation);
+    procedure WriteLineComment(Level: Integer; Text: string);
 
     // specific writers
     procedure WriteGenericPropExt(Level: Integer; DataType: string; ID: string; ExtData: string; Value: string);
@@ -174,8 +173,7 @@ type
     procedure CheckModelSurfaces(pBSP: TLTWorldBsp);
   public
     procedure ExportText(S: string);
-    constructor Create(pReader: TLTWorldReader; szBrushType: string;
-      szBrushGenType: string; bIgnoreObjects: Boolean);
+    constructor Create(pReader: TLTWorldReader);
     destructor Destroy; override;
   end;
 
@@ -209,11 +207,11 @@ begin
     if m_slClassList.IndexOf(pObject.TypeString) = -1 then
     begin
       m_slClassList.Add(pObject.TypeString);
-    end;
+    end
   end;
-  // world geometry class
-  m_slClassList.Add('PhysicsBSP');
-  m_slClassList.SaveToFile(CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'ClassList.txt');
+  // world geometry classes
+  m_slClassList.Add(m_szMainGeometrySource);
+  m_slClassList.SaveToFile(CPData.DumpsDir + CPData.Sep + 'ClassList.txt');
 end;
 
 procedure TLTAWorldExporter.BuildSimpleBrushObject(pObject: TLTWorldBsp);
@@ -501,17 +499,30 @@ begin
 end;
 end;
 
-constructor TLTAWorldExporter.Create(pReader: TLTWorldReader;
-  szBrushType: string; szBrushGenType: string; bIgnoreObjects: Boolean);
+constructor TLTAWorldExporter.Create(pReader: TLTWorldReader);
 begin
-  if szBrushType = 'avp2' then m_nBrushType := BT_AVP2
-  else if szBrushType = 'nolf2' then m_nBrushType := BT_NOLF2;
-  if szBrushGenType = 'simple' then m_nBrushGetType := BGT_SIMPLE
-  else if szBrushGenType = 'poly' then m_nBrushGetType := BGT_POLY;
+  if g_szBrushType = 'avp2' then m_nBrushType := BT_AVP2
+  else if g_szBrushType = 'nolf2' then m_nBrushType := BT_NOLF2;
+  if g_szBrushGenType = 'simple' then m_nBrushGetType := BGT_SIMPLE
+  else if g_szBrushGenType = 'poly' then m_nBrushGetType := BGT_POLY;
+
+  m_pReader := pReader;
+
+  if g_szGeometrySource = 'physics' then
+  begin
+    m_szMainGeometrySource := BSP_PHYSICS;
+    m_pReader.RemoveWorldModel(BSP_VIS);
+  end
+  else if g_szGeometrySource = 'vis' then
+  begin
+    m_szMainGeometrySource := BSP_VIS;
+    m_pReader.RemoveWorldModel(BSP_PHYSICS);
+  end;
+
+  m_pReader.MoveWorldModel(m_szMainGeometrySource, m_pReader.ModelList.pModelList.Count - 1);
+
   //m_pMyCP := pCP;
   //m_pLogger := pLogger;
-  m_bIgnoreObjects := bIgnoreObjects;
-  m_pReader := pReader;
   m_slExport := TStringList.Create;
   m_slClassList := TStringList.Create;
   m_slModelList := TStringList.Create;
@@ -610,6 +621,11 @@ begin
   m_slExport.Add(GetLevel(Level) + '(' + LTRotationToStrC(Rotation) + ' )');
 end;
 
+procedure TLTAWorldExporter.WriteLineComment(Level: Integer; Text: string);
+begin
+  m_slExport.Add(GetLevel(Level) + '// ' + Text);
+end;
+
 procedure TLTAWorldExporter.WriteHeader(Level: Integer);
 begin
   WriteNodeStart(Level, NODE_HEADER, '');
@@ -629,33 +645,45 @@ var pModel: TLTWorldBsp;
     bSepBsp: Boolean;
 begin
   WriteNodeStart(Level, NODE_POLYHEDRONLIST, '');
-  bSepBsp := False;
-  //Logger.WLog(LM_WARN, IntToStr(m_pReader.ModelList.nNumModels));
+
   for i := 0 to m_pReader.ModelList.nNumModels - 1 do
   begin
+    bSepBsp := False;
     pModel := TLTWorldData(m_pReader.ModelList.pModelList.Items[i]).OriginalBSP;
-    // ignore visbsps for now
-    if (pModel.WorldName <> 'VisBSP') then //and (pModel.WorldName <> 'PhysicsBSP') then
+
+    //if (pModel.WorldName = BSP_PHYSICS) then
+    //  Sleep(0);
+
+    //if (pModel.WorldName <> 'VisBSP') then //and (pModel.WorldName <> 'PhysicsBSP') then
+    //if WorldModelFilter(pModel.WorldName) then
     begin
-       m_slModelList.Add(pModel.WorldName);
+      m_slModelList.Add(pModel.WorldName);
+
       // construct brush props
       if m_nBrushGetType = BGT_POLY then
       begin
-        if pModel.WorldName = 'PhysicsBSP' then
+        if pModel.WorldName = m_szMainGeometrySource then
         begin
           BuildPolyBrushObject(pModel);
           bSepBsp := True;
         end
-        else BuildSimpleBrushObject(pModel);
+        else
+        begin
+          BuildSimpleBrushObject(pModel);
+        end;
       end
-      else if m_nBrushGetType = BGT_SIMPLE then BuildSimpleBrushObject(pModel);
+      else if m_nBrushGetType = BGT_SIMPLE then
+      begin
+        BuildSimpleBrushObject(pModel);
+      end;
 
       if not bSepBsp then
       begin
         WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
+
         // debug START
-        //WriteGenericPropStr(Level + 2, PROP_BSPNAME, pModel.WorldName);
-        //WriteGenericProp(Level + 2, PROP_BRUSHINDEX, IntToStr(i));
+        if g_bDebugProps = True then
+          WriteLineComment(Level + 2, pModel.WorldName + ' brush #' + IntToStr(i));
         // debug END
 
         WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
@@ -717,7 +745,6 @@ begin
             WriteArrayEnd(Level + 5);
             WriteNodeEnd(Level + 4);
 
-
             WriteArrayEnd(Level + 3);
           end;
         end;
@@ -729,9 +756,11 @@ begin
         for n := 0 to pModel.Polies - 1 do
         begin
           WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
-          // test
-          //WriteGenericPropStr(Level + 2, PROP_BSPNAME, pModel.WorldName);
-          //WriteGenericProp(Level + 2, PROP_BRUSHINDEX, IntToStr(i));
+
+          // debuf START
+          if g_bDebugProps = True then
+            WriteLineComment(Level + 2, pModel.WorldName + IntToStr(n) + ' brush #' + {%H-}IntToStr(i + n));
+          // debug END
 
           WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
           pPoly := TLTWorldPoly(pModel.PoliesList.Items[n]);
@@ -800,7 +829,7 @@ begin
     end;
   end;
   WriteNodeEnd(Level);
-  m_slModelList.SaveToFile(CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'ModelList.txt');
+  m_slModelList.SaveToFile(CPData.DumpsDir + CPData.Sep + 'ModelList.txt');
 end;
 
 procedure TLTAWorldExporter.WriteNodeHierarchy(Level: Integer);
@@ -848,7 +877,7 @@ begin
     WriteNodeStart(Level + 4, NODE_CHILDLIST, '');
     //Inc(nNodeCounter, 1);
 
-    if m_slClassList.Strings[i] = 'PhysicsBSP' then
+    if m_slClassList.Strings[i] = m_szMainGeometrySource then
     begin
       if m_nBrushGetType = BGT_SIMPLE then
       begin
@@ -860,14 +889,14 @@ begin
         WriteGenericProp(Level + 6, PROP_FLAGS, '( )');
         WriteArrayStart(Level + 6, ARRAY_PROPERTIES, '');
         WriteGenericPropStr(Level + 7, PROP_NAME, 'Brush');
-        WriteGenericProp(Level + 7, PROP_PROPID, IntToStr(Int64(m_pReader.ObjectList.nNumObjects) + Int64(m_slModelList.Count)));
+        WriteGenericProp(Level + 7, PROP_PROPID, {%H-}IntToStr(m_pReader.ObjectList.nNumObjects + Cardinal(m_slModelList.Count)));
         //WriteGenericProp(Level + 7, PROP_PROPID, IntToStr(nNodeCounter));
         WriteArrayEnd(Level + 6);
         WriteArrayEnd(Level + 5);
       end
       else if m_nBrushGetType = BGT_POLY then
       begin
-        pBSP := TLTWorldData(m_pReader.ModelList.pModelList.Items[m_pReader.ModelList.nNumModels - 2]).OriginalBSP;
+        pBSP := TLTWorldData(m_pReader.ModelList.pModelList.Items[m_pReader.ModelList.nNumModels - 1]).OriginalBSP;
         for j := 0 to pBSP.Polies - 1 do
         begin
           Inc(nNodeCounter, 1);
@@ -878,7 +907,7 @@ begin
           WriteGenericProp(Level + 6, PROP_FLAGS, '( )');
           WriteArrayStart(Level + 6, ARRAY_PROPERTIES, '');
           WriteGenericPropStr(Level + 7, PROP_NAME, 'Brush');
-          WriteGenericProp(Level + 7, PROP_PROPID, IntToStr(Int64(m_pReader.ObjectList.nNumObjects) + Int64(m_slModelList.Count) + j));
+          WriteGenericProp(Level + 7, PROP_PROPID, {%H-}IntToStr(m_pReader.ObjectList.nNumObjects + Cardinal(m_slModelList.Count + j)));
           //WriteGenericProp(Level + 7, PROP_PROPID, IntToStr(nNodeCounter));
           WriteArrayEnd(Level + 6);
           WriteArrayEnd(Level + 5);
@@ -892,6 +921,11 @@ begin
         pObject := TLTWorldObject(m_pReader.ObjectList.pObjectList.Items[j]);
         if pObject.TypeString = m_slClassList.Strings[i] then
         begin
+          // debug START
+          if g_bDebugProps then
+            WriteLineComment(Level + 5, pObject.GetObjectName);
+          // debug END
+
           Inc(nNodeCounter, 1);
           WriteArrayStart(Level + 5, ARRAY_WORLDNODE, '');
           WriteGenericProp(Level + 6, PROP_TYPE, 'object');
@@ -946,6 +980,12 @@ var i: Cardinal;
 begin
   pWorldObject := TLTWorldObject(m_pReader.ObjectList.pObjectList.Items[nIndex]);
   WriteNodeStart(Level, NODE_PROPLIST, '');
+
+  // debug START
+  if g_bDebugProps then
+    WriteLineComment(Level + 1, 'prop #' + {%H-}IntToStr(nIndex + 1));
+  // debug END
+
   //WriteGenericProp(Level + 1, '  propid ', IntToStr(nCounter));
   if pWorldObject.NumProperties > 0 then
   for i := 0 to pWorldObject.NumProperties - 1 do
@@ -961,6 +1001,12 @@ var i: Cardinal;
 begin
   pBrush := TLTWorldBrush(m_pBrushPropList.Items[nIndex]);
   WriteNodeStart(Level, NODE_PROPLIST, '');
+
+  // debug START
+  if g_bDebugProps then
+    WriteLineComment(Level + 1, 'prop #' + {%H-}IntToStr(m_pReader.ObjectList.nNumObjects + nIndex + 1) + ' brush #' + IntToStr(nIndex));
+  // debug END
+
   //WriteGenericProp(Level + 1, '  propid ', IntToStr(nCounter));
   if pBrush.NumProperties > 0 then
   for i := 0 to pBrush.NumProperties - 1 do
@@ -1005,7 +1051,7 @@ begin
     end;
     PT_ROTATION:
     begin
-      WriteGenericPropExt(Level + 1, PROP_ROTATION, pObject.PropName , szExtData, '(eulerangles (' + LTRotationToStrC(@pObject.DataRot) + ') )');
+      WriteGenericPropExt(Level + 1, PROP_ROTATION, pObject.PropName , szExtData, '(eulerangles (' + LTRotationIgnoreWToStrC(@pObject.DataRot) + ') )');
     end;
   end;
 end;

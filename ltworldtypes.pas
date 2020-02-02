@@ -8,6 +8,9 @@ uses
   Classes, SysUtils, contnrs;
 
 const
+  BSP_PHYSICS = 'PhysicsBSP';
+  BSP_VIS = 'VisBSP';
+
   PT_STRING = 0;
   PT_VECTOR = 1;
   PT_COLOR = 2;
@@ -128,7 +131,13 @@ type
     pModelList: TFPObjectList;
   end;
 
+  TWorldLMAnimList = record
+    nNumLMAnims: Cardinal;
+    pLMAnimList: TFPObjectList;
+  end;
+
 function LTVectorToStrC(V: PLTVector): string;
+function LTRotationIgnoreWToStrC(R: PLTRotation): string;
 function LTRotationToStrC(R: PLTRotation): string;
 function LTVectorInit(x, y, z: LTFloat): LTVector;
 function LTRotationInit(x, y, z, w: LTFloat): LTRotation;
@@ -158,6 +167,13 @@ begin
   Result := FormatFloat('0.000000', V^.x) + ' ' +
            FormatFloat('0.000000', V^.y) + ' ' +
            FormatFloat('0.000000', V^.z);
+end;
+
+function LTRotationIgnoreWToStrC(R: PLTRotation): string;
+begin
+  Result := FormatFloat('0.000000', R^.x) + ' ' +
+           FormatFloat('0.000000', R^.y) + ' ' +
+           FormatFloat('0.000000', R^.z);
 end;
 
 function LTRotationToStrC(R: PLTRotation): string;

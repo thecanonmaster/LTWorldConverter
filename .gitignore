@@ -33,3 +33,7 @@ lib/
 # Project specific
 log.txt
 dumps/
+tmp/
+*.bat
+*.dat
+*.lta

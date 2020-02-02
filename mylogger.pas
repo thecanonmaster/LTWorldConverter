@@ -8,11 +8,17 @@ uses
   Classes, SysUtils, eventlog;
 
 type
+
+  { TMyLameLogger }
+
   TMyLameLogger = class(TObject)
   private
   protected
+    m_nRootLevel: Integer;
     m_pLogger2: TEventLog;
   public
+    property RootLevel: Integer read m_nRootLevel write m_nRootLevel;
+    function CheckRootLevel(Mode: Integer): Boolean;
     procedure WLog(Mode: integer; Msg: string);
     procedure WLogStrings(Mode: integer; szIdentifier: string; slList: TStringList);
     procedure WLogStringsEx(Mode: integer; szIdentifier: string; aslArgs: array of TStringList);
@@ -35,18 +41,27 @@ begin
   m_pLogger2.FileName := szFileName;
   m_pLogger2.LogType := ltFile;
   m_pLogger2.TimeStampFormat := 'hh:nn:ss.zzz';
+  m_nRootLevel := LM_INFO;
   DeleteFile(szFileName);
   WLog(LM_INFO, 'Program started...');
 end;
 
 destructor TMyLameLogger.Destroy;
 begin
+  m_nRootLevel := LM_INFO;
   WLog(LM_INFO, 'Program stopped...');
   inherited;
 end;
 
+function TMyLameLogger.CheckRootLevel(Mode: Integer): Boolean;
+begin
+  if m_nRootLevel <= Mode then Result := True else Result := False;
+end;
+
 procedure TMyLameLogger.WLog(Mode: integer; Msg: string);
 begin
+  if not CheckRootLevel(Mode) then Exit;
+
   case Mode of
     LM_INFO: m_pLogger2.Info(Msg);
     LM_WARN:
@@ -69,6 +84,8 @@ var
   i: integer;
   Level: TEventType;
 begin
+  if not CheckRootLevel(Mode) then Exit;
+
   case Mode of
     LM_INFO: Level := etInfo;
     LM_WARN: Level := etWarning;
@@ -87,6 +104,8 @@ var
   Level: TEventType;
   szBufferStr: string;
 begin
+  if not CheckRootLevel(Mode) then Exit;
+
   case Mode of
     LM_INFO: Level := etInfo;
     LM_WARN: Level := etWarning;

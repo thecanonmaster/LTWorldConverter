@@ -7,8 +7,10 @@ interface
 uses
   Classes, SysUtils, ltworldtypes, contnrs, globals, MyLogger;
 
+const
+  LANDSCAPE_LIGHTMAPS_PER_LINE = 60;
+
 type
-  TStringArray = array of string;
 
   TUnknownStruct = packed record
     n1: Cardinal;
@@ -50,7 +52,6 @@ type
     nDummy3: Byte;
   end;
   TLTDiskVertList = array[0..MAX_WORLDPOLY_VERTS - 1] of TLTDiskVert;
-  TDynCardinalArray = array of Cardinal;
   TLTNodeIndices = array[0..1] of Cardinal;
 
   TLTWorldNode = class(TObject)
@@ -81,7 +82,9 @@ type
     m_vCenter: LTVector;
     m_fRadius: LTFloat;
 
-    m_nUnknownFlags: Cardinal;
+    m_nLightmapWidth: Word;
+    m_nLightmapHeight: Word;
+
     m_nUnknownNum: Word;
     m_anUnknownList: TDynCardinalArray;
 
@@ -96,7 +99,8 @@ type
   public
     property Radius: LTFloat read m_fRadius write m_fRadius;
     property Center: LTVector read m_vCenter write m_vCenter;
-    property UnknownFlags: Cardinal read m_nUnknownFlags write m_nUnknownFlags;
+    property LightmapWidth: Word read m_nLightmapWidth write m_nLightmapWidth;
+    property LightmapHeight: Word read m_nLightmapHeight write m_nLightmapHeight;
     property UnknownNum: Word read m_nUnknownNum write m_nUnknownNum;
     property UnknownList: TDynCardinalArray read m_anUnknownList write m_anUnknownList;
 
@@ -136,16 +140,13 @@ type
     m_nTotalVisListSize: Cardinal;
     m_nLeafLists: Cardinal;
     m_nNodes: Cardinal;
+    m_nSections: Cardinal;
     m_vMinBox: LTVector;
     m_vMaxBox: LTVector;
     m_vWorldTranslation: LTVector;
     m_nNamesLen: Cardinal;
     m_nTextures: Cardinal;
     m_aszTextureNames: TStringArray;
-    m_nRootNode: Cardinal;
-    m_nRootNodeStatus: Cardinal;
-
-    m_UnknownStruct: TUnknownStruct;
 
     m_pPolies: TFPObjectList;
     m_pPlanes: TFPObjectList;
@@ -169,9 +170,6 @@ type
     property Nodes: Cardinal read m_nNodes write m_nNodes;
     property Textures: Cardinal read m_nTextures write m_nTextures;
 
-    property RootNode: Cardinal read m_nRootNode write m_nRootNode;
-    property RootNodeStatus: Cardinal read m_nRootNodeStatus write m_nRootNodeStatus;
-
     property MinBox: LTVector read m_vMinBox write m_vMinBox;
     property MaxBox: LTVector read m_vMaxBox write m_vMaxBox;
     property WorldTranslation: LTVector read m_vWorldTranslation write m_vWorldTranslation;
@@ -184,16 +182,19 @@ type
     property PointsList: TFPObjectList read m_pPoints write m_pPoints;
     property NodesList: TFPObjectList read m_pNodes write m_pNodes;
 
-    property UnknownStruct: TUnknownStruct read m_UnknownStruct write m_UnknownStruct;
-
     function Load(FS: TMemoryStream; bUsePlaneTypes: Boolean): Integer;
     procedure ReadTextures(FS: TMemoryStream);
     procedure ReadPolies(FS: TMemoryStream; bReadData: Boolean);
+    procedure ReadLeafsJP(FS: TMemoryStream);
     procedure ReadLeafs(FS: TMemoryStream);
     procedure ReadPlanes(FS: TMemoryStream);
     procedure ReadSurfaces(FS: TMemoryStream);
     procedure ReadPoints(FS: TMemoryStream);
+    procedure ReadNodesJP(FS: TMemoryStream);
     procedure ReadNodes(FS: TMemoryStream);
+    procedure ReadRootNode(FS: TMemoryStream);
+    procedure ReadUserPortals(FS: TMemoryStream);
+    procedure ReadPBlockTable(FS: TMemoryStream);
 
     procedure SaveNodesDump(S: string);
 
@@ -215,10 +216,294 @@ type
     destructor Destroy; override;
   end;
 
+  { TLMFramePolyData }
+
+  TLMFramePolyData = class(TObject)
+  public
+    m_nVertices: Byte;
+    m_anData: TDynByteArray;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  { TLMFrame }
+
+  TLMFrame = class(TObject)
+  public
+    m_nSize: Word;
+    m_nDecSize: Word;
+    m_nWidth: Word;
+    m_nHeight: Word;
+    m_nLandscapeX: Word;
+    m_nLandscapeY: Word;
+    m_anData: TDynByteArray;
+    m_anDecData: TDynByteArray;
+    procedure SwapRB;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  { TLMBatch }
+
+  TLMBatch = class(TObject)
+  private
+    m_pFrames: TFPObjectList;
+    m_pFramePolyData: TFPObjectList;
+  public
+    property FramesList: TFPObjectList read m_pFrames write m_pFrames;
+    property FramePolyDataList: TFPObjectList read m_pFramePolyData write m_pFramePolyData;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  TLMPolyRef = class(TObject)
+  public
+    m_nModelIndex: Word;
+    m_nPolyIndex: Word;
+    m_pWorldPoly: TLTWorldPoly;
+  end;
+
+  { TLTLightAnim }
+
+  { TLMAnim }
+
+  TLMAnim = class(TObject)
+  private
+    m_szName: string;
+    m_nBatches: Byte;
+    m_nFrames: Word;
+    m_pPolyRefs: TFPObjectList;
+    m_pBatches: TFPObjectList;
+    procedure CreateFramesLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
+    procedure CreatePolyDataLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
+  public
+    property Name: string read m_szName write m_szName;
+    property Batches: Byte read m_nBatches write m_nBatches;
+    property Frames: Word read m_nFrames write m_nFrames;
+    property PolyRefsList: TFPObjectList read m_pPolyRefs write m_pPolyRefs;
+    property BatchesList: TFPObjectList read m_pBatches write m_pBatches;
+    procedure SaveBatchesOnDisk;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
 function w_NodeForIndex(nListSize: Cardinal; nIndex: Integer; var nStatus: Cardinal): Cardinal;
 procedure w_SetPlaneTypes(pNodeList: TFPObjectList; pPolyList: TFPObjectList; pPlaneList: TFPObjectList; nNodes: Cardinal; bUsePlaneTypes: Boolean);
 
 implementation
+
+{ TLMFramePolyData }
+
+constructor TLMFramePolyData.Create;
+begin
+  m_nVertices := 0;
+end;
+
+destructor TLMFramePolyData.Destroy;
+begin
+  inherited Destroy;
+  if m_nVertices > 0 then
+    SetLength(m_anData, 0);
+end;
+
+{ TLMFrame }
+
+procedure TLMFrame.SwapRB;
+var i: Integer;
+    nTemp: Byte;
+begin
+  i := 0;
+  while i < Length(m_anDecData) do
+  begin
+    nTemp := m_anDecData[i];
+    m_anDecData[i] := m_anDecData[i + 2];
+    m_anDecData[i + 2] := nTemp;
+    if m_anDecData[i + 3] <> 0 then
+      Logger.WLog(LM_WARN, 'LM alpha is not zero for some reason!');
+    Inc(i, 4)
+  end;
+end;
+
+constructor TLMFrame.Create;
+begin
+  m_nSize := 0;
+  m_nDecSize := 0;
+end;
+
+destructor TLMFrame.Destroy;
+begin
+  inherited Destroy;
+  if m_nSize > 0 then SetLength(m_anData, 0);
+  if m_nDecSize > 0 then SetLength(m_anDecData, 0);
+end;
+
+{ TLMBatch }
+
+constructor TLMBatch.Create;
+begin
+  m_pFrames := TFPObjectList.Create(True);
+  m_pFramePolyData := TFPObjectList.Create(True);
+end;
+
+destructor TLMBatch.Destroy;
+begin
+  inherited Destroy;
+  m_pFrames.Free;
+  m_pFramePolyData.Free;
+end;
+
+{ TLMAnim }
+
+procedure TLMAnim.CreateFramesLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
+var i: Cardinal;
+    pFrame: TLMFrame;
+    nLineWidth, nLineHeight: Word;
+    nLineCounter: Cardinal = 0;
+    bFinalLine: Boolean = False;
+begin
+  MS.WriteWord(m_nFrames);
+  nLineWidth := 0;
+  nLineHeight := 0;
+
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pFrame := TLMFrame(pBatch.m_pFrames.Items[i]);
+
+    MS.WriteWord(pFrame.m_nWidth);
+    MS.WriteWord(pFrame.m_nHeight);
+
+    if pFrame.m_nSize = 0 then
+      Continue;
+
+    if nLineCounter < LANDSCAPE_LIGHTMAPS_PER_LINE then
+    begin
+      Inc(nLineWidth, pFrame.m_nWidth);
+
+      if pFrame.m_nHeight > nLineHeight then
+        nLineHeight := pFrame.m_nHeight;
+
+      Inc(nLineCounter, 1);
+
+      pFrame.m_nLandscapeX := nLineWidth - pFrame.m_nWidth;
+      pFrame.m_nLandscapeY := nFullHeight;
+
+      bFinalLine := True;
+    end
+    else
+    begin
+      pFrame.m_nLandscapeX := nLineWidth - pFrame.m_nWidth;
+      pFrame.m_nLandscapeY := nFullHeight;
+
+      if nLineWidth > nFullWidth then
+        nFullWidth := nLineWidth;
+      Inc(nFullHeight, nLineHeight);
+
+      nLineCounter := 0;
+      nLineWidth := 0;
+      nLineHeight := 0;
+
+      bFinalLine := False;
+    end;
+
+    MS.WriteWord(pFrame.m_nLandscapeX);
+    MS.WriteWord(pFrame.m_nLandscapeY);
+  end;
+
+  if bFinalLine then
+  begin
+    if nLineWidth > nFullWidth then
+      nFullWidth := nLineWidth;
+    Inc(nFullHeight, nLineHeight);
+  end;
+
+  SetLength(Buffer, nFullWidth * nFullHeight * 4);
+
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pFrame := TLMFrame(pBatch.m_pFrames.Items[i]);
+
+    if pFrame.m_nSize = 0 then
+      Continue;
+
+    SimpleBlt32(TDynCardinalArray(Buffer), TDynCardinalArray(pFrame.m_anDecData),
+      nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
+
+    {Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 0] := $FF;
+    Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 1] := $FF;
+    Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 2] := $FF;}
+  end;
+end;
+
+procedure TLMAnim.CreatePolyDataLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
+var i: Cardinal;
+    pPolyData: TLMFramePolyData;
+    nSize: Cardinal = 0;
+    nAdjustedSize: Cardinal = 0;
+    nPos: Cardinal = 0;
+begin
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pPolyData := TLMFramePolyData(pBatch.m_pFramePolyData.Items[i]);
+    Inc(nSize, pPolyData.m_nVertices);
+    MS.WriteByte(pPolyData.m_nVertices);
+  end;
+  nFullWidth := Trunc(sqrt(nSize) + 1);
+  nFullHeight := nFullWidth;
+  nAdjustedSize := nFullWidth * nFullHeight * 3;
+
+  SetLength(Buffer, nAdjustedSize);
+  FillByte(Buffer[0], nAdjustedSize, 0);
+
+  nPos := 0;
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pPolyData := TLMFramePolyData(pBatch.m_pFramePolyData.Items[i]);
+    Move(pPolyData.m_anData[0], Buffer[nPos], pPolyData.m_nVertices * 3);
+    nPos := nPos + Cardinal(pPolyData.m_nVertices * 3);
+  end;
+end;
+
+procedure TLMAnim.SaveBatchesOnDisk;
+var i: Cardinal;
+    anBuffer: TDynByteArray;
+    nWidth: Word = 0;
+    nHeight: Word = 0;
+    pBatch: TLMBatch;
+    MS: TMemoryStream;
+begin
+  for i := 0 to m_nBatches - 1 do
+  begin
+    MS := TMemoryStream.Create;
+    pBatch := TLMBatch(m_pBatches.Items[i]);
+    CreateFramesLandscape(anBuffer{%H-}, pBatch, nWidth, nHeight, MS);
+
+    if nWidth * nHeight > 0 then
+      SaveArrayToTGA(anBuffer, nWidth, nHeight, CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '.tga', 4, True, False);
+
+    SetLength(anBuffer, 0);
+
+    CreatePolyDataLandscape(anBuffer{%H-}, pBatch, nWidth, nHeight, MS);
+
+    if nWidth * nHeight > 0 then
+      SaveArrayToTGA(anBuffer, nWidth, nHeight, CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '_polydata.tga', 3, False, False);
+
+    SetLength(anBuffer, 0);
+    MS.SaveToFile(CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '.index');
+    MS.Free;
+  end;
+end;
+
+constructor TLMAnim.Create;
+begin
+  m_pPolyRefs := TFPObjectList.Create(True);
+  m_pBatches := TFPObjectList.Create(True);
+end;
+
+destructor TLMAnim.Destroy;
+begin
+  inherited Destroy;
+  m_pPolyRefs.Free;
+end;
 
 procedure TLTWorldPoly.ReadPoly(FS: TMemoryStream);
 //var i: Cardinal;
@@ -226,13 +511,15 @@ begin
   FS.Read(m_vCenter, SizeOf(LTVector));
   //FS.Read(m_fRadius, 4);
 
-  FS.Read(m_nUnknownFlags, 4);
+  FS.Read(m_nLightmapWidth, 2);
+  FS.Read(m_nLightmapHeight, 2);
+
   FS.Read(m_nUnknownNum, 2);
 
   if m_nUnknownNum > 0 then
   begin
     SetLength(m_anUnknownList, m_nUnknownNum);
-    FS.Read(m_anUnknownList[0], 4 * m_nUnknownNum);
+    FS.Read(m_anUnknownList[0], SizeOf(Cardinal) * m_nUnknownNum);
   end;
 
   FS.Read(m_nSurface, 4);
@@ -288,7 +575,7 @@ begin
   dwUnknown3 := 0;
   nNameLen := 0;
   FS.Read(dwWorldInfoFlags, 4);
-  Assert((dwWorldInfoFlags and $ffff0000) = 0, 'ASSERT FAILED!');
+  //Assert((dwWorldInfoFlags and $ffff0000) = 0, 'ASSERT FAILED!');
   m_nWorldInfoFlags := dwWorldInfoFlags;
   FS.Read(dwUnknown, 4);
   FS.Read(nNameLen, 2);
@@ -316,23 +603,36 @@ begin
   FS.Read(m_vMaxBox, SizeOf(LTVector));
   FS.Read(m_vWorldTranslation, SizeOf(LTVector));
 
+  FS.Read(m_nNamesLen, 4);
+  FS.Read(m_nTextures, 4);
+
   ReadTextures(FS);
   ReadPolies(FS, False);
+  ReadLeafs(FS);
   // fuck this!
-  if m_nLeafs > 0 then
+  {if m_nLeafs > 0 then
   begin
     Logger.WLog(LM_WARN, 'WorldModel "' + m_szWorldName + '" has leafs > 0');
     Exit(-1);
-  end;
-
-  //if m_nLeafs = 0 then
-  //   ReadLeafs(FS); //else FS.Position := $1C87;
+  end;  }
 
   ReadPlanes(FS);
   ReadSurfaces(FS);
   ReadPoints(FS);
   ReadPolies(FS, True);
   ReadNodes(FS);
+  ReadUserPortals(FS);
+  ReadPBlockTable(FS);
+  ReadRootNode(FS);
+
+  FS.Read(m_nSections, 4);
+  if m_nSections > 0 then
+    Logger.WLog(LM_WARN, 'WorldModel "' + m_szWorldName + '" has terrain sections > 0');
+
+  if m_szWorldName = 'VisBSP' then
+  begin
+    Sleep(0);
+  end;
 
   w_SetPlaneTypes(m_pNodes, m_pPolies, m_pPlanes, m_nNodes, bUsePlaneTypes);
 
@@ -340,7 +640,7 @@ begin
 
 end;
 
-procedure TLTWorldBsp.ReadNodes(FS: TMemoryStream);
+procedure TLTWorldBsp.ReadNodesJP(FS: TMemoryStream);
 var i, j, nPoly, nStatus: Cardinal;
     pNode: TLTWorldNode;
     nLeaf: Word;
@@ -384,7 +684,124 @@ begin
   end;
 
   // test
-  FS.Read(m_UnknownStruct{%H-}, SizeOf(TUnknownStruct));
+  //FS.Read(m_UnknownStruct{%H-}, SizeOf(TUnknownStruct));
+end;
+
+procedure TLTWorldBsp.ReadNodes(FS: TMemoryStream);
+var i, j, nPoly, nStatus: Cardinal;
+    pNode: TLTWorldNode;
+    nLeaf: Word;
+    nNodeIndex: Integer;
+begin
+  if m_nNodes > 0 then
+  begin
+
+    nPoly := 0;
+    nLeaf := 0;
+    nNodeIndex := 0;
+    nStatus := 0;
+    for i := 0 to m_nNodes - 1 do
+    begin
+      pNode := TLTWorldNode.Create;
+      FS.Read(nPoly, 4);
+      if nPoly >= m_nPolies then
+      begin
+        Logger.WLog(LM_ERROR, Format('Node %d has invalid poly index (%d)', [i, nPoly]));
+        Exit;
+      end;
+      pNode.Poly := nPoly;
+
+      FS.Read(nLeaf, 2);
+      pNode.Leaf := nLeaf;
+
+      for j := 0 to 1 do
+      begin
+        FS.Read(nNodeIndex, 4);
+        pNode.m_anSides[j] := w_NodeForIndex(m_nNodes, nNodeIndex, nStatus);
+        pNode.m_anSidesStatus[j] := nStatus;
+      end;
+
+      m_pNodes.Add(pNode);
+    end;
+  end;
+end;
+
+procedure TLTWorldBsp.ReadRootNode(FS: TMemoryStream);
+var pNode: TLTWorldNode;
+    nNodeIndex, nStatus: Cardinal;
+begin
+  nNodeIndex := 0;
+  nStatus := 0;
+
+  pNode := TLTWorldNode.Create;
+
+  FS.Read(nNodeIndex, 4);
+  pNode.m_anSides[0] := w_NodeForIndex(m_nNodes, nNodeIndex, nStatus);
+  pNode.m_anSidesStatus[0] := nStatus;
+
+  m_pNodes.Add(pNode);
+end;
+
+procedure TLTWorldBsp.ReadUserPortals(FS: TMemoryStream);
+var i: Cardinal;
+    nNameLen: Word = 0;
+    szName: string;
+    nTempCardinal: Cardinal = 0;
+    nTempWord: Word = 0;
+    vTempVector: LTVector;
+begin
+  if m_nUserPortals > 0 then
+  begin
+    for i := 0 to m_nUserPortals - 1 do
+    begin
+      FS.Read(nNameLen, 2);
+      SetLength(szName, nNameLen);
+      FS.Read(szName[1], nNameLen);
+      FS.Read(nTempCardinal, 4);
+      FS.Read(nTempCardinal, 4);
+      FS.Read(nTempWord, 2);
+      FS.Read(vTempVector{%H-}, SizeOf(LTVector));
+      FS.Read(vTempVector, SizeOf(LTVector));
+    end;
+  end;
+end;
+
+procedure TLTWorldBsp.ReadPBlockTable(FS: TMemoryStream);
+var nTempCardinal1, nTempCardinal2, nTempCardinal3, i: Cardinal;
+    nCounterCardinal: Cardinal = 0;
+    vTempVector: LTVector;
+    nCounterWord: Word = 0;
+    nTempWord: Word = 0;
+    anTempBuffer: array of Byte;
+begin
+  nTempCardinal1 := 0;
+  nTempCardinal2 := 0;
+  nTempCardinal3 := 0;
+  FS.Read(nTempCardinal1, 4);
+  FS.Read(nTempCardinal2, 4);
+  FS.Read(nTempCardinal3, 4);
+
+  nCounterCardinal := nTempCardinal1 * nTempCardinal2 * nTempCardinal3;
+
+  FS.Read(vTempVector{%H-}, SizeOf(LTVector));
+  FS.Read(vTempVector, SizeOf(LTVector));
+
+  if nCounterCardinal > 0 then
+  begin
+    for i := 0 to nCounterCardinal - 1 do
+    begin
+      FS.Read(nCounterWord, 2);
+      FS.Read(nTempWord, 2);
+
+      if nCounterWord > 0 then
+      begin
+        SetLength(anTempBuffer, 6 * nCounterWord);
+        FS.Read(anTempBuffer[0], 6 * nCounterWord);
+        SetLength(anTempBuffer, 0);
+      end;
+    end;
+  end;
+
 end;
 
 procedure TLTWorldBsp.SaveNodesDump(S: string);
@@ -541,9 +958,6 @@ end;
 procedure TLTWorldBsp.ReadTextures(FS: TMemoryStream);
 var i, j: Cardinal;
 begin
-  FS.Read(m_nNamesLen, 4);
-  FS.Read(m_nTextures, 4);
-
   if m_nTextures > 0 then
   for i := 0 to m_nTextures - 1 do
   begin
@@ -562,13 +976,12 @@ begin
   end;
 end;
 
-procedure TLTWorldBsp.ReadLeafs(FS: TMemoryStream);
+procedure TLTWorldBsp.ReadLeafsJP(FS: TMemoryStream);
 var i, j: Cardinal;
     nNumLeafLists: Word;
     nPoliesCount: Cardinal = 0;
     nTempWord: Word = 0;
 begin
-  WriteLn('LeafsTest: ',  IntToHex(FS.Position, 8));
   nNumLeafLists := 0;
   if m_nLeafs > 0 then
   begin
@@ -584,8 +997,53 @@ begin
       end;
       FS.Read(nPoliesCount, 4);
       FS.Read(nTempWord, 2);
-      FS.Position := FS.Position + (Int64(nPoliesCount) * 4);
+      FS.Position := FS.Position {%H-}+ (nPoliesCount * 4);
       FS.Read(nTempWord, 2);
+    end;
+  end;
+end;
+
+procedure TLTWorldBsp.ReadLeafs(FS: TMemoryStream);
+var i, j: Cardinal;
+    nNumLeafLists: Word = 0;
+    nTempWord: Word = 0;
+    anTempArray: array of Byte;
+    nPoliesCount: Cardinal = 0;
+    nUnknownCardinal: Cardinal = 0;
+begin
+  if m_nLeafs > 0 then
+  begin
+    for i := 0 to m_nLeafs - 1 do
+    begin
+      FS.Read(nNumLeafLists, 2);
+      if nNumLeafLists = $FFFF then
+      begin
+        FS.Read(nTempWord, 2);
+      end
+      else
+      begin
+        if nNumLeafLists > 0 then
+        begin
+          for j := 0 to nNumLeafLists - 1 do
+          begin
+            FS.Read(nTempWord, 2);
+            FS.Read(nTempWord, 2);
+            SetLength(anTempArray, nTempWord);
+            FS.Read(anTempArray[0], nTempWord);
+            SetLength(anTempArray, 0);
+          end;
+        end;
+      end;
+      FS.Read(nPoliesCount, 4);
+      if nPoliesCount > 0 then
+      begin
+        for j := 0 to nPoliesCount - 1 do
+        begin
+          FS.Read(nTempWord, 2);
+          FS.Read(nTempWord, 2);
+        end;
+      end;
+      FS.Read(nUnknownCardinal, 4);
     end;
   end;
 end;
