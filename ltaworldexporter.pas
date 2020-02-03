@@ -1,7 +1,7 @@
 unit ltaworldexporter;
 
 {$mode objfpc}{$H+}
-
+{$WARN 4079 off : Converting the operands to "$1" before doing the add could prevent overflow errors.}
 interface
 
 uses
@@ -108,6 +108,9 @@ const
   BT_NOLF2 = 1;
   BGT_SIMPLE = 0;
   BGT_POLY = 1;
+  //BGT_SIMPLE2 = 2;
+
+  //POLIES_PER_MODEL_SIMPLE2 = 500000;
 
 type
   TLTWorldBrush = class(TLTWorldObject)
@@ -163,12 +166,18 @@ type
     procedure WritePropData(Level: Integer; pObject: TLTWorldObjectProperty);
     procedure WriteNavigatorPosList(Level: Integer);
 
+    // BSP writers
+    procedure WriteSimpleBSP(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+    //procedure WriteSimple2BSPs(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+    procedure WritePolyBSPs(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+
     // helpers
     function GetLevel(Level: Integer): string;
     function GetExtData({%H-}pProperty: TLTWorldObjectProperty): string;
     procedure BuildClassList(nLength: Cardinal; pObjectList: TFPObjectList);
     procedure BuildSimpleBrushObject(pObject: TLTWorldBsp);
     procedure BuildPolyBrushObject(pObject: TLTWorldBsp);
+    //procedure BuildSimple2BrushObject(pObject: TLTWorldBsp);
     function FindBrushPropId(szName: string): Cardinal;
     procedure CheckModelSurfaces(pBSP: TLTWorldBsp);
   public
@@ -244,7 +253,7 @@ begin
 			(  longint "LightControl" ( groupowner group1  ) ( data 0.000000 ))
 			(  string "TextureEffect" ( textureeffect ) )
 			(  color "AmbientLight" ( group1  ) ( data ( vector (0.000000 0.000000 0.000000) ) ) )
-			(  longint "LMGridSize" ( group1  ) ( data 0.000000 ))
+			(  longint "LMGridSize" ( group1  ) ( data 0.000000 pSurface))
 			(  bool "ClipLight" ( group1  ) ( data 1 ))
 			(  bool "CastShadowMesh" ( group1  ) ( data 1 ))
 			(  bool "ReceiveLight" ( group1  ) ( data 1 ))
@@ -458,6 +467,72 @@ begin
   end;
 end;
 
+{procedure TLTAWorldExporter.BuildSimple2BrushObject(pObject: TLTWorldBsp);
+var i, nCount: Cardinal;
+    pPoly: TLTWorldPoly;
+    pSurface: TLTWorldSurface;
+    pBrush: TLTWorldBrush;
+begin
+  if pObject.Polies > 0 then
+  begin
+    if m_nBrushType = BT_AVP2 then
+    begin
+
+      nCount := pObject.Polies div POLIES_PER_MODEL_SIMPLE2;
+      if pObject.Polies mod POLIES_PER_MODEL_SIMPLE2 > 0 then
+        Inc(nCount, 1);
+
+      for i := 0 to nCount - 1 do
+      begin
+        pBrush := TLTWorldBrush.Create;
+        pBrush.BspName := pObject.WorldName + IntToStr(i);
+
+        pPoly := TLTWorldPoly(pObject.PoliesList.Items[0]);
+        pSurface := TLTWorldSurface(pObject.SurfacesList.Items[pPoly.Surface]);
+
+        pBrush.WritePropString('Name', 'Brush_' + pBrush.BspName);
+        pBrush.WritePropVector('Pos', LTVectorInit(0, 0, 0));
+        pBrush.WritePropRotation('Rotation', LTRotationInit(0, 0, 0, 0));
+
+        pBrush.WritePropBool('Solid', FlagsToBool(pSurface.m_nFlags, SURF_SOLID));
+        pBrush.WritePropBool('Nonexistant', FlagsToBool(pSurface.m_nFlags, SURF_NONEXISTANT));
+        pBrush.WritePropBool('Invisible', FlagsToBool(pSurface.m_nFlags, SURF_INVISIBLE));
+        pBrush.WritePropBool('Translucent', FlagsToBool(pSurface.m_nFlags, SURF_TRANSPARENT));
+        pBrush.WritePropBool('SkyPortal', FlagsToBool(pSurface.m_nFlags, SURF_SKY));
+        pBrush.WritePropBool('FullyBright', FlagsToBool(pSurface.m_nFlags, SURF_BRIGHT));
+        pBrush.WritePropBool('FlatShade', FlagsToBool(pSurface.m_nFlags, SURF_FLATSHADE));
+        pBrush.WritePropBool('GouraudShade', FlagsToBool(pSurface.m_nFlags, SURF_GOURAUDSHADE));
+        pBrush.WritePropBool('LightMap', FlagsToBool(pSurface.m_nFlags, SURF_LIGHTMAP));
+        pBrush.WritePropBool('Subdivide', FlagsToBool(pSurface.m_nFlags, SURF_NOSUBDIV, True));
+        pBrush.WritePropBool('HullMaker', FlagsToBool(pSurface.m_nFlags, SURF_HULLMAKER));
+        pBrush.WritePropBool('AlwaysLightMap', FlagsToBool(pSurface.m_nFlags, SURF_ALWAYSLIGHTMAP));
+        pBrush.WritePropBool('DirectionalLight', FlagsToBool(pSurface.m_nFlags, SURF_DIRECTIONALLIGHT));
+        pBrush.WritePropBool('Portal', FlagsToBool(pSurface.m_nFlags, SURF_PORTAL));
+        pBrush.WritePropBool('NoSnap', 1);
+        pBrush.WritePropBool('SkyPan', FlagsToBool(pSurface.m_nFlags, SURF_PANNINGSKY));
+        pBrush.WritePropBool('Additive', FlagsToBool(pSurface.m_nFlags, SURF_ADDITIVE));
+        pBrush.WritePropBool('TerrainOccluder', FlagsToBool(pSurface.m_nFlags, SURF_TERRAINOCCLUDER));
+        pBrush.WritePropBool('TimeOfDay', FlagsToBool(pSurface.m_nFlags, SURF_TIMEOFDAY));
+        pBrush.WritePropBool('VisBlocker', FlagsToBool(pSurface.m_nFlags, SURF_VISBLOCKER));
+        pBrush.WritePropBool('NotAStep', FlagsToBool(pSurface.m_nFlags, SURF_NOTASTEP));
+        pBrush.WritePropBool('NoWallWalk', FlagsToBool(pSurface.m_nFlags, SURF_NOWALLWALK));
+        pBrush.WritePropBool('BlockLight', FlagsToBool(pSurface.m_nFlags, SURF_NOBLOCKLIGHT, True));
+        pBrush.WritePropLongInt('DetailLevel', 0);
+        pBrush.WritePropString('Effect', pSurface.m_szEffect);
+        pBrush.WritePropString('EffectParam', pSurface.m_szEffectParam);
+        pBrush.WritePropReal('FrictionCoefficient', 1);
+
+        m_pBrushPropList.Add(pBrush);
+      end;
+    end
+    else if m_nBrushType = BT_NOLF2 then
+    begin
+      // Nope
+    end;
+
+  end;
+end;}
+
 function TLTAWorldExporter.FindBrushPropId(szName: string): Cardinal;
 var i: Cardinal;
 begin
@@ -503,6 +578,7 @@ constructor TLTAWorldExporter.Create(pReader: TLTWorldReader);
 begin
   if g_szBrushType = 'avp2' then m_nBrushType := BT_AVP2
   else if g_szBrushType = 'nolf2' then m_nBrushType := BT_NOLF2;
+
   if g_szBrushGenType = 'simple' then m_nBrushGetType := BGT_SIMPLE
   else if g_szBrushGenType = 'poly' then m_nBrushGetType := BGT_POLY;
 
@@ -636,19 +712,12 @@ end;
 
 procedure TLTAWorldExporter.WritePolyhedronList(Level: Integer);
 var pModel: TLTWorldBsp;
-    pPoly: TLTWorldPoly;
-    pPlane: TLTWorldPlane;
-    pSurface: TLTWorldSurface;
-    i, j, k, n: Cardinal;
-    szPointsList: string;
-    vNull: LTVector;
-    bSepBsp: Boolean;
+    i: Cardinal;
 begin
   WriteNodeStart(Level, NODE_POLYHEDRONLIST, '');
 
   for i := 0 to m_pReader.ModelList.nNumModels - 1 do
   begin
-    bSepBsp := False;
     pModel := TLTWorldData(m_pReader.ModelList.pModelList.Items[i]).OriginalBSP;
 
     //if (pModel.WorldName = BSP_PHYSICS) then
@@ -660,172 +729,30 @@ begin
       m_slModelList.Add(pModel.WorldName);
 
       // construct brush props
-      if m_nBrushGetType = BGT_POLY then
-      begin
-        if pModel.WorldName = m_szMainGeometrySource then
-        begin
-          BuildPolyBrushObject(pModel);
-          bSepBsp := True;
-        end
-        else
-        begin
-          BuildSimpleBrushObject(pModel);
-        end;
-      end
-      else if m_nBrushGetType = BGT_SIMPLE then
+      if pModel.WorldName <> m_szMainGeometrySource then
       begin
         BuildSimpleBrushObject(pModel);
-      end;
-
-      if not bSepBsp then
-      begin
-        WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
-
-        // debug START
-        if g_bDebugProps = True then
-          WriteLineComment(Level + 2, pModel.WorldName + ' brush #' + IntToStr(i));
-        // debug END
-
-        WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
-        if pModel.Points > 0 then
-        begin
-          WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
-          for j := 0 to pModel.Points - 1 do
-          begin
-            WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[j]).m_vData);
-          end;
-          WriteArrayEnd(Level + 2);
-        end;
-        WriteNodeStart(Level + 2, NODE_POLYLIST, '');
-        if pModel.Polies > 0 then
-        begin
-          for j := 0 to pModel.Polies - 1 do
-          begin
-            WriteArrayStart(Level + 3, ARRAY_EDITPOLY, '');
-            pPoly := TLTWorldPoly(pModel.PoliesList.Items[j]);
-
-            szPointsList := '';
-            if pPoly.GetNumVertices > 0 then
-            // SURF_PHYSICSFIX polies?
-            //for k := 0 to pPoly.GetNumVertices - 1 do
-            for k := 0 to pPoly.LoVerts - 1 do
-            begin
-              szPointsList := szPointsList + ' ' + IntToStr(pPoly.DiskVerts[k].nVerts);
-            end;
-            WriteGenericProp(Level + 4, PROP_F, szPointsList);
-
-            pPlane := TLTWorldPlane(pModel.PlanesList.Items[pPoly.Plane]);
-            WriteGenericProp(Level + 4, PROP_N, LTVectorToStrC(@pPlane.m_vNormal));
-            WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
-
-            WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
-            WriteVector(Level + 5, @pPoly.UVData1);
-            WriteVector(Level + 5, @pPoly.UVData2);
-            WriteVector(Level + 5, @pPoly.UVData3);
-            WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
-            pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
-            WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
-            WriteArrayEnd(Level + 4);
-
-            WriteGenericSet(Level + 4, [PROP_FLAGS]);
-            WriteGenericSet(Level + 4, [PROP_SHADE, '0', '0', '0']);
-            WriteGenericPropStr(Level + 4, PROP_PHYSICSMATERIAL, 'Default');
-            WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
-
-            WriteNodeStart(Level + 4, NODE_TEXTURES, '');
-            WriteArrayStart(Level + 5, ' 1 ', '');
-            WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
-            vNull := LTVectorInit(0, 0, 0);
-            WriteVector(Level + 7, @vNull);
-            WriteVector(Level + 7, @pPoly.UVData2);
-            WriteVector(Level + 7, @pPoly.UVData3);
-            WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
-            WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
-            WriteArrayEnd(Level + 6);
-            WriteArrayEnd(Level + 5);
-            WriteNodeEnd(Level + 4);
-
-            WriteArrayEnd(Level + 3);
-          end;
-        end;
-        WriteNodeEnd(Level + 2);
-        WriteNodeEnd(Level + 1);
+        WriteSimpleBSP(Level, pModel, i);
       end
       else
       begin
-        for n := 0 to pModel.Polies - 1 do
+        if m_nBrushGetType = BGT_POLY then
         begin
-          WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
-
-          // debuf START
-          if g_bDebugProps = True then
-            WriteLineComment(Level + 2, pModel.WorldName + IntToStr(n) + ' brush #' + {%H-}IntToStr(i + n));
-          // debug END
-
-          WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
-          pPoly := TLTWorldPoly(pModel.PoliesList.Items[n]);
-          if pPoly.LoVerts > 0 then
-          begin
-            WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
-            for j := 0 to pPoly.LoVerts - 1 do
-            begin
-              WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[j].nVerts]).m_vData);
-            end;
-            WriteArrayEnd(Level + 2);
-          end;
-          WriteNodeStart(Level + 2, NODE_POLYLIST, '');
-
-          WriteArrayStart(Level + 3, ARRAY_EDITPOLY, '');
-
-          szPointsList := '';
-          if pPoly.GetNumVertices > 0 then
-          // SURF_PHYSICSFIX polies?
-          //for k := 0 to pPoly.GetNumVertices - 1 do
-          for k := 0 to pPoly.LoVerts - 1 do
-          begin
-            szPointsList := szPointsList + ' ' + IntToStr(k);
-          end;
-          WriteGenericProp(Level + 4, PROP_F, szPointsList);
-
-          pPlane := TLTWorldPlane(pModel.PlanesList.Items[pPoly.Plane]);
-          WriteGenericProp(Level + 4, PROP_N, LTVectorToStrC(@pPlane.m_vNormal));
-          WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
-
-          WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
-          WriteVector(Level + 5, @pPoly.UVData1);
-          WriteVector(Level + 5, @pPoly.UVData2);
-          WriteVector(Level + 5, @pPoly.UVData3);
-          WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
-          pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
-          WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
-          WriteArrayEnd(Level + 4);
-
-          WriteGenericSet(Level + 4, [PROP_FLAGS]);
-          WriteGenericSet(Level + 4, [PROP_SHADE, '0', '0', '0']);
-          WriteGenericPropStr(Level + 4, PROP_PHYSICSMATERIAL, 'Default');
-          WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
-
-          WriteNodeStart(Level + 4, NODE_TEXTURES, '');
-          WriteArrayStart(Level + 5, ' 1 ', '');
-          WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
-          vNull := LTVectorInit(0, 0, 0);
-          WriteVector(Level + 7, @vNull);
-          WriteVector(Level + 7, @pPoly.UVData2);
-          WriteVector(Level + 7, @pPoly.UVData3);
-          WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
-          WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
-          WriteArrayEnd(Level + 6);
-          WriteArrayEnd(Level + 5);
-          WriteNodeEnd(Level + 4);
-
-
-          WriteArrayEnd(Level + 3);
-
-
-          WriteNodeEnd(Level + 2);
-          WriteNodeEnd(Level + 1);
-        end;
+          BuildPolyBrushObject(pModel);
+          WritePolyBSPs(Level, pModel, i);
+        end
+        else if m_nBrushGetType = BGT_SIMPLE then
+        begin
+          BuildSimpleBrushObject(pModel);
+          WriteSimpleBSP(Level, pModel, i);
+        end
+        {else if m_nBrushGetType = BGT_SIMPLE2 then
+        begin
+          BuildSimple2BrushObject(pModel);
+          WriteSimple2BSPs(Level, pModel, i);
+        end; }
       end;
+
     end;
   end;
   WriteNodeEnd(Level);
@@ -834,7 +761,7 @@ end;
 
 procedure TLTAWorldExporter.WriteNodeHierarchy(Level: Integer);
 var i, j, k: Integer;
-    nNodeCounter: Cardinal;
+    nNodeCounter{, nSimple2Count}: Cardinal;
     pObject: TLTWorldObject;
     pBSP: TLTWorldBsp;
 begin
@@ -894,6 +821,29 @@ begin
         WriteArrayEnd(Level + 6);
         WriteArrayEnd(Level + 5);
       end
+      {else if m_nBrushGetType = BGT_SIMPLE2 then
+      begin
+        pBSP := TLTWorldData(m_pReader.ModelList.pModelList.Items[m_pReader.ModelList.nNumModels - 1]).OriginalBSP;
+        nSimple2Count := pBSP.Polies div POLIES_PER_MODEL_SIMPLE2;
+        if pBSP.Polies mod POLIES_PER_MODEL_SIMPLE2 > 0 then
+        Inc(nSimple2Count, 1);
+
+        for j := 0 to nSimple2Count - 1 do
+        begin
+          Inc(nNodeCounter, 1);
+          WriteArrayStart(Level + 5, ARRAY_WORLDNODE, '');
+          WriteGenericProp(Level + 6, PROP_TYPE, 'brush');
+          WriteGenericProp(Level + 6, PROP_BRUSHINDEX, IntToStr(m_slModelList.Count - 1 + j));
+          WriteGenericProp(Level + 6, PROP_NODEID, IntToStr(nNodeCounter));
+          WriteGenericProp(Level + 6, PROP_FLAGS, '( )');
+          WriteArrayStart(Level + 6, ARRAY_PROPERTIES, '');
+          WriteGenericPropStr(Level + 7, PROP_NAME, 'Brush');
+          WriteGenericProp(Level + 7, PROP_PROPID, {%H-}IntToStr(m_pReader.ObjectList.nNumObjects + Cardinal(m_slModelList.Count + j)));
+          //WriteGenericProp(Level + 7, PROP_PROPID, IntToStr(nNodeCounter));
+          WriteArrayEnd(Level + 6);
+          WriteArrayEnd(Level + 5);
+        end;
+      end }
       else if m_nBrushGetType = BGT_POLY then
       begin
         pBSP := TLTWorldData(m_pReader.ModelList.pModelList.Items[m_pReader.ModelList.nNumModels - 1]).OriginalBSP;
@@ -1094,6 +1044,275 @@ procedure TLTAWorldExporter.WriteNavigatorPosList(Level: Integer);
 begin
   WriteNodeStart(Level, NODE_NAVIGATORPOSLIST, '');
   WriteNodeEnd(Level);
+end;
+
+procedure TLTAWorldExporter.WriteSimpleBSP(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+var j, k: Cardinal;
+    pPoly: TLTWorldPoly;
+    pPlane: TLTWorldPlane;
+    pSurface: TLTWorldSurface;
+    szPointsList: string;
+    vNull: LTVector;
+begin
+  WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
+
+  // debug START
+  if g_bDebugProps = True then
+    WriteLineComment(Level + 2, pModel.WorldName + ' brush #' + IntToStr(i));
+  // debug END
+
+  WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
+  if pModel.Points > 0 then
+  begin
+    WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
+    for j := 0 to pModel.Points - 1 do
+    begin
+      WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[j]).m_vData);
+    end;
+    WriteArrayEnd(Level + 2);
+  end;
+  WriteNodeStart(Level + 2, NODE_POLYLIST, '');
+  if pModel.Polies > 0 then
+  begin
+    for j := 0 to pModel.Polies - 1 do
+    begin
+      WriteArrayStart(Level + 3, ARRAY_EDITPOLY, '');
+      pPoly := TLTWorldPoly(pModel.PoliesList.Items[j]);
+
+      szPointsList := '';
+      if pPoly.GetNumVertices > 0 then
+      // SURF_PHYSICSFIX polies?
+      //for k := 0 to pPoly.GetNumVertices - 1 do
+      for k := 0 to pPoly.LoVerts - 1 do
+      begin
+        szPointsList := szPointsList + ' ' + IntToStr(pPoly.DiskVerts[k].nVerts);
+      end;
+      WriteGenericProp(Level + 4, PROP_F, szPointsList);
+
+      pPlane := TLTWorldPlane(pModel.PlanesList.Items[pPoly.Plane]);
+      WriteGenericProp(Level + 4, PROP_N, LTVectorToStrC(@pPlane.m_vNormal));
+      WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
+
+      WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
+      WriteVector(Level + 5, @pPoly.UVData1);
+      WriteVector(Level + 5, @pPoly.UVData2);
+      WriteVector(Level + 5, @pPoly.UVData3);
+      WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
+      pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
+      WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+      WriteArrayEnd(Level + 4);
+
+      WriteGenericSet(Level + 4, [PROP_FLAGS]);
+      WriteGenericSet(Level + 4, [PROP_SHADE, '0', '0', '0']);
+      WriteGenericPropStr(Level + 4, PROP_PHYSICSMATERIAL, 'Default');
+      WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
+
+      WriteNodeStart(Level + 4, NODE_TEXTURES, '');
+      WriteArrayStart(Level + 5, ' 1 ', '');
+      WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
+      vNull := LTVectorInit(0, 0, 0);
+      WriteVector(Level + 7, @vNull);
+      WriteVector(Level + 7, @pPoly.UVData2);
+      WriteVector(Level + 7, @pPoly.UVData3);
+      WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
+      WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
+      WriteArrayEnd(Level + 6);
+      WriteArrayEnd(Level + 5);
+      WriteNodeEnd(Level + 4);
+
+      WriteArrayEnd(Level + 3);
+    end;
+  end;
+  WriteNodeEnd(Level + 2);
+  WriteNodeEnd(Level + 1);
+end;
+
+{procedure TLTAWorldExporter.WriteSimple2BSPs(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+var j, k, n: Cardinal;
+    nStart, nEnd, nLastFullPart, nCurrPart: Cardinal;
+    pPoly: TLTWorldPoly;
+    pPlane: TLTWorldPlane;
+    pSurface: TLTWorldSurface;
+    szPointsList: string;
+    vNull: LTVector;
+begin
+  nLastFullPart := pModel.Polies div POLIES_PER_MODEL_SIMPLE2;
+  n := 0;
+  while n < pModel.Polies do
+  begin
+    nCurrPart := n div POLIES_PER_MODEL_SIMPLE2;
+    nStart := nCurrPart * POLIES_PER_MODEL_SIMPLE2;
+    if nCurrPart = nLastFullPart then
+    begin
+      nEnd := pModel.Polies;
+    end
+    else
+    begin
+      nEnd := (nCurrPart + 1) * POLIES_PER_MODEL_SIMPLE2;
+    end;
+
+    WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
+
+    // debug START
+    if g_bDebugProps = True then
+      WriteLineComment(Level + 2, pModel.WorldName + ' brush #' + IntToStr(i + nCurrPart));
+    // debug END
+
+    WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
+
+    WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
+    for j := nStart to nEnd - 1 do
+    begin
+      pPoly := TLTWorldPoly(pModel.PoliesList.Items[j]);
+      if pPoly.LoVerts > 0 then
+      begin
+        for k := 0 to pPoly.LoVerts - 1 do
+        begin
+          WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[k].nVerts]).m_vData);
+        end;
+      end;
+    end;
+    WriteArrayEnd(Level + 2);
+
+    WriteNodeStart(Level + 2, NODE_POLYLIST, '');
+
+    for j := nStart to nEnd - 1 do
+    begin
+      WriteArrayStart(Level + 3, ARRAY_EDITPOLY, '');
+      pPoly := TLTWorldPoly(pModel.PoliesList.Items[j]);
+
+      szPointsList := '';
+      if pPoly.GetNumVertices > 0 then
+      // SURF_PHYSICSFIX polies?
+      //for k := 0 to pPoly.GetNumVertices - 1 do
+      for k := 0 to pPoly.LoVerts - 1 do
+      begin
+        szPointsList := szPointsList + ' ' + IntToStr(pPoly.DiskVerts[k].nVerts);
+      end;
+      WriteGenericProp(Level + 4, PROP_F, szPointsList);
+
+      pPlane := TLTWorldPlane(pModel.PlanesList.Items[pPoly.Plane]);
+      WriteGenericProp(Level + 4, PROP_N, LTVectorToStrC(@pPlane.m_vNormal));
+      WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
+
+      WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
+      WriteVector(Level + 5, @pPoly.UVData1);
+      WriteVector(Level + 5, @pPoly.UVData2);
+      WriteVector(Level + 5, @pPoly.UVData3);
+      WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
+      pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
+      WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+      WriteArrayEnd(Level + 4);
+
+      WriteGenericSet(Level + 4, [PROP_FLAGS]);
+      WriteGenericSet(Level + 4, [PROP_SHADE, '0', '0', '0']);
+      WriteGenericPropStr(Level + 4, PROP_PHYSICSMATERIAL, 'Default');
+      WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
+
+      WriteNodeStart(Level + 4, NODE_TEXTURES, '');
+      WriteArrayStart(Level + 5, ' 1 ', '');
+      WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
+      vNull := LTVectorInit(0, 0, 0);
+      WriteVector(Level + 7, @vNull);
+      WriteVector(Level + 7, @pPoly.UVData2);
+      WriteVector(Level + 7, @pPoly.UVData3);
+      WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
+      WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
+      WriteArrayEnd(Level + 6);
+      WriteArrayEnd(Level + 5);
+      WriteNodeEnd(Level + 4);
+
+      WriteArrayEnd(Level + 3);
+
+      Inc(n, 1);
+    end;
+
+    WriteNodeEnd(Level + 2);
+    WriteNodeEnd(Level + 1);
+
+  end;
+end; }
+
+procedure TLTAWorldExporter.WritePolyBSPs(Level: Integer; pModel: TLTWorldBsp; i: Cardinal);
+var n, j, k: Cardinal;
+    pPoly: TLTWorldPoly;
+    pPlane: TLTWorldPlane;
+    pSurface: TLTWorldSurface;
+    szPointsList: string;
+    vNull: LTVector;
+begin
+  for n := 0 to pModel.Polies - 1 do
+  begin
+    WriteNodeStart(Level + 1, NODE_POLYHEDRON, '');
+
+    // debuf START
+    if g_bDebugProps = True then
+      WriteLineComment(Level + 2, pModel.WorldName + IntToStr(n) + ' brush #' + {%H-}IntToStr(i + n));
+    // debug END
+
+    WriteGenericSet(Level + 2, [ PROP_COLOR2, '255', '255', '255']);
+    pPoly := TLTWorldPoly(pModel.PoliesList.Items[n]);
+    if pPoly.LoVerts > 0 then
+    begin
+      WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
+      for j := 0 to pPoly.LoVerts - 1 do
+      begin
+        WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[j].nVerts]).m_vData);
+      end;
+      WriteArrayEnd(Level + 2);
+    end;
+    WriteNodeStart(Level + 2, NODE_POLYLIST, '');
+
+    WriteArrayStart(Level + 3, ARRAY_EDITPOLY, '');
+
+    szPointsList := '';
+    if pPoly.GetNumVertices > 0 then
+    // SURF_PHYSICSFIX polies?
+    //for k := 0 to pPoly.GetNumVertices - 1 do
+    for k := 0 to pPoly.LoVerts - 1 do
+    begin
+      szPointsList := szPointsList + ' ' + IntToStr(k);
+    end;
+    WriteGenericProp(Level + 4, PROP_F, szPointsList);
+
+    pPlane := TLTWorldPlane(pModel.PlanesList.Items[pPoly.Plane]);
+    WriteGenericProp(Level + 4, PROP_N, LTVectorToStrC(@pPlane.m_vNormal));
+    WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
+
+    WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
+    WriteVector(Level + 5, @pPoly.UVData1);
+    WriteVector(Level + 5, @pPoly.UVData2);
+    WriteVector(Level + 5, @pPoly.UVData3);
+    WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
+    pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
+    WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+    WriteArrayEnd(Level + 4);
+
+    WriteGenericSet(Level + 4, [PROP_FLAGS]);
+    WriteGenericSet(Level + 4, [PROP_SHADE, '0', '0', '0']);
+    WriteGenericPropStr(Level + 4, PROP_PHYSICSMATERIAL, 'Default');
+    WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
+
+    WriteNodeStart(Level + 4, NODE_TEXTURES, '');
+    WriteArrayStart(Level + 5, ' 1 ', '');
+    WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
+    vNull := LTVectorInit(0, 0, 0);
+    WriteVector(Level + 7, @vNull);
+    WriteVector(Level + 7, @pPoly.UVData2);
+    WriteVector(Level + 7, @pPoly.UVData3);
+    WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
+    WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
+    WriteArrayEnd(Level + 6);
+    WriteArrayEnd(Level + 5);
+    WriteNodeEnd(Level + 4);
+
+
+    WriteArrayEnd(Level + 3);
+
+
+    WriteNodeEnd(Level + 2);
+    WriteNodeEnd(Level + 1);
+  end;
 end;
 
 procedure TLTAWorldExporter.WriteLTWorld;

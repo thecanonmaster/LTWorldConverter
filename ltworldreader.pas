@@ -44,6 +44,7 @@ type
   public
     procedure ReadWorld;
     procedure RemoveWorldModel(szName: string);
+    procedure RemoveWorldObject(szName: string);
     procedure MoveWorldModel(szName: string; nToIndex: Integer);
 
     property Header: TWorldHeader read WorldHeader write WorldHeader;
@@ -290,6 +291,9 @@ begin
       WLogInt('| | SurfaceFlags', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags);
       WLogStr('| | | SurfaceFlagsBin = ' + binStr(TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags, 32));
       WLogInt('| | Unknown1', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown1);
+      WLogInt('| | Unknown2', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown2);
+      WLogInt('| | Unknown3', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown3);
+      WLogInt('| | Unknown4', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown4);
       WLogInt('| | UseEffect', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUseEffect);
       WLogStr('| | | Effect = ' + TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_szEffect);
       WLogStr('| | | EffectParam = ' + TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_szEffectParam);
@@ -328,7 +332,7 @@ begin
       if pWorldPoly.UnknownNum > 0 then
       for k := 0 to pWorldPoly.UnknownNum - 1 do
       begin
-        szDump := szDump + ' [' + IntToStr(pWorldPoly.UnknownList[k]) + ']';
+        szDump := szDump + ' [' + IntToStr(pWorldPoly.UnknownList[k]) + ', ' + IntToStr(pWorldPoly.UnknownList[k+1]) + ']';
       end;
       WLogStr('| | | UnknownDump =' + szDump);
 
@@ -599,6 +603,22 @@ begin
        Dec(WorldModelList.nNumModels, 1);
        Exit;
      end;
+  end;
+end;
+
+procedure TLTWorldReader.RemoveWorldObject(szName: string);
+var i: Cardinal;
+    pObject: TLTWorldObject;
+begin
+  for i := 0 to ObjectList.nNumObjects - 1 do
+  begin
+    pObject := TLTWorldObject(WorldObjectList.pObjectList.Items[i]);
+    if pObject.GetObjectName = szName then
+    begin
+      WorldObjectList.pObjectList.Delete(i);
+      Dec(WorldObjectList.nNumObjects, 1);
+      Exit;
+    end;
   end;
 end;
 

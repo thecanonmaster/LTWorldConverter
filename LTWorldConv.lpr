@@ -24,7 +24,6 @@ var
 
 procedure TLTWorldConv.DoRun;
 var Filename: string;
-    //LTAFilename: string;
     WorldReader: TLTWorldReader;
     LTAExporter: TLTAWorldExporter;
     szLogLevel: string;
@@ -33,13 +32,13 @@ begin
 
   FormatSettings.DecimalSeparator := '.';
   Filename := GetOptionValue('f', '');
-  //LTAFilename := GetOptionValue('e', '');
   g_szBrushType := GetOptionValue('b', '');
   g_szBrushGenType := GetOptionValue('g', '');
   g_szGeometrySource := GetOptionValue('s', '');
-  g_bDumpNodes := HasOption('d', '');
-  g_bIgnoreObjects := HasOption('i', '');
+  g_bDumpNodes := HasOption('n', '');
+  //g_bIgnoreObjects := HasOption('i', '');
   g_bReadLightAnims := HasOption('l', '');
+  g_bDebugProps := HasOption('d', '');
 
   if HasOption('o', '') then
   begin
@@ -65,19 +64,17 @@ begin
     WriteLn('   -e: Output LTA world file. Can be read by AVP2 and NOLF2 DEdits.');
     WriteLn('   -b: Brush type (avp2 or nolf2). For AVP2 or NOLF2.');
     WriteLn('   -g: Brush generation type (simple or poly). For each worldmodel or for each poly.');
-    WriteLn('   -d: Dump BSP nodes.');
-    WriteLn('   -s: Main geometry source (physics, vis or both).');
+    WriteLn('   -n: Dump BSP nodes.');
+    WriteLn('   -d: "Debug" mode, adds comments into LTA file.');
+    WriteLn('   -s: Main geometry source (physics or vis).');
     //WriteLn('   -i: Do not include objects into LTA world file.');
     WriteLn('   -l: Read lightanims and save to disk.');
     WriteLn('   -o: Log level 0 - 3 (INFO - DEBUG).');
   end;
-  //if not CPData.FileExists(LTAFilename) then LTAFilename := 'world.lta';
+
   if (g_szBrushType <> 'nolf2') and (g_szBrushType <> 'avp2') then g_szBrushType := 'avp2';
-
   if (g_szBrushGenType <> 'simple') and (g_szBrushGenType <> 'poly') then g_szBrushGenType := 'poly';
-
-  if (g_szGeometrySource <> 'physics') and (g_szGeometrySource <> 'vis') and (g_szGeometrySource <> 'both')
-    then g_szGeometrySource := 'physics';
+  if (g_szGeometrySource <> 'physics') and (g_szGeometrySource <> 'vis') then g_szGeometrySource := 'physics';
 
   if (CPData.FileExists(Filename)) then
   begin

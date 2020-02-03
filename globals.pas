@@ -8,10 +8,11 @@ uses
   Classes, SysUtils, MyLogger, MyCrossPlatform, ltworldtypes;
 
 const
-  LTWC_VERSION = 'v0.123 alpha';
+  LTWC_VERSION = 'v0.124 alpha';
 
 type
   TDynByteArray = array of Byte;
+  TDynWordArray = array of Word;
   TStringArray = array of string;
   TDynCardinalArray = array of Cardinal;
 
@@ -22,9 +23,9 @@ var
   g_szBrushGenType: string;
   g_szGeometrySource: string;
   g_bDumpNodes: Boolean;
-  g_bIgnoreObjects: Boolean;
+  //g_bIgnoreObjects: Boolean;
   g_bReadLightAnims: Boolean;
-  g_bDebugProps: Boolean = False;
+  g_bDebugProps: Boolean;
 
 procedure WLogReal(S: string; F: LTFloat);
 procedure WLogVec(S: string; V: PLTVector);

@@ -27,7 +27,10 @@ type
     m_fUV3: LTVector;
     m_nTexture: Word;
     m_nFlags: Cardinal;
-    m_nUnknown1: Cardinal;
+    m_nUnknown1: Byte;
+    m_nUnknown2: Byte;
+    m_nUnknown3: Byte;
+    m_nUnknown4: Byte;
     m_nUseEffect: Byte;
     m_szEffect: string;
     m_szEffectParam: string;
@@ -86,7 +89,7 @@ type
     m_nLightmapHeight: Word;
 
     m_nUnknownNum: Word;
-    m_anUnknownList: TDynCardinalArray;
+    m_anUnknownList: TDynWordArray;
 
     m_fUV1: LTVector;
     m_fUV2: LTVector;
@@ -102,7 +105,7 @@ type
     property LightmapWidth: Word read m_nLightmapWidth write m_nLightmapWidth;
     property LightmapHeight: Word read m_nLightmapHeight write m_nLightmapHeight;
     property UnknownNum: Word read m_nUnknownNum write m_nUnknownNum;
-    property UnknownList: TDynCardinalArray read m_anUnknownList write m_anUnknownList;
+    property UnknownList: TDynWordArray read m_anUnknownList write m_anUnknownList;
 
     property LoVerts: Byte read m_nLoVerts write m_nLoVerts;
     property HiVerts: Byte read m_nHiVerts write m_nHiVerts;
@@ -518,8 +521,8 @@ begin
 
   if m_nUnknownNum > 0 then
   begin
-    SetLength(m_anUnknownList, m_nUnknownNum);
-    FS.Read(m_anUnknownList[0], SizeOf(Cardinal) * m_nUnknownNum);
+    SetLength(m_anUnknownList, m_nUnknownNum * 2);
+    FS.Read(m_anUnknownList[0], SizeOf(Word) * m_nUnknownNum * 2);
   end;
 
   FS.Read(m_nSurface, 4);
@@ -566,6 +569,7 @@ end;
 function TLTWorldBsp.Load(FS: TMemoryStream; bUsePlaneTypes: Boolean): Integer;
 var dwWorldInfoFlags, dwUnknown, dwUnknown2, dwUnknown3: Cardinal;
     nNameLen: Word;
+    nTemp: Integer;
     //pVertex: TLTWorldVertex;
 begin
   Result := 0;
@@ -583,6 +587,10 @@ begin
   FS.Read(m_szWorldName[1], nNameLen);
 
   WriteLn('--- Loading: ', m_szWorldName);
+  nTemp := Logger.RootLevel;
+  Logger.RootLevel := LM_INFO;
+  WLogStr('--- Loading: ' + m_szWorldName);
+  Logger.RootLevel := nTemp;
 
   FS.Read(m_nPoints, 4);
   FS.Read(m_nPlanes, 4);
@@ -627,12 +635,7 @@ begin
 
   FS.Read(m_nSections, 4);
   if m_nSections > 0 then
-    Logger.WLog(LM_WARN, 'WorldModel "' + m_szWorldName + '" has terrain sections > 0');
-
-  if m_szWorldName = 'VisBSP' then
-  begin
-    Sleep(0);
-  end;
+    Logger.WLog(LM_WARN, 'WorldModel has terrain sections > 0');
 
   w_SetPlaneTypes(m_pNodes, m_pPolies, m_pPlanes, m_nNodes, bUsePlaneTypes);
 
@@ -728,7 +731,8 @@ end;
 
 procedure TLTWorldBsp.ReadRootNode(FS: TMemoryStream);
 var pNode: TLTWorldNode;
-    nNodeIndex, nStatus: Cardinal;
+    nStatus: Cardinal;
+    nNodeIndex: Integer;
 begin
   nNodeIndex := 0;
   nStatus := 0;
@@ -885,7 +889,10 @@ begin
     FS.Read(pSurface.m_fUV3, sizeof(LTVector));
     FS.Read(pSurface.m_nTexture, 2);
     FS.Read(pSurface.m_nFlags, 4);
-    FS.Read(pSurface.m_nUnknown1, 4);
+    FS.Read(pSurface.m_nUnknown1, 1);
+    FS.Read(pSurface.m_nUnknown2, 1);
+    FS.Read(pSurface.m_nUnknown3, 1);
+    FS.Read(pSurface.m_nUnknown4, 1);
     FS.Read(pSurface.m_nUseEffect, 1);
     if pSurface.m_nUseEffect > 0 then
     begin
@@ -971,7 +978,14 @@ begin
     Dec(j, 1);
     SetLength(m_aszTextureNames[i], j - 1);
     FS.Position := FS.Position - j;
-    FS.Read(m_aszTextureNames[i][1], j - 1);
+    if j - 1 > 0 then
+    begin
+      FS.Read(m_aszTextureNames[i][1], j - 1);
+    end
+    else
+    begin
+      Logger.WLog(LM_WARN, 'Texture #' + IntToStr(i) + ' has zero length!');
+    end;
     FS.Position := FS.Position + 1;
   end;
 end;
