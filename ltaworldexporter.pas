@@ -1,7 +1,6 @@
 unit ltaworldexporter;
 
 {$mode objfpc}{$H+}
-{$WARN 4079 off : Converting the operands to "$1" before doing the add could prevent overflow errors.}
 interface
 
 uses
