@@ -273,6 +273,7 @@ type
   TLMAnim = class(TObject)
   private
     m_szName: string;
+    m_nLMType: Cardinal;
     m_nBatches: Byte;
     m_nFrames: Word;
     m_pPolyRefs: TFPObjectList;
@@ -281,6 +282,7 @@ type
     procedure CreatePolyDataLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
   public
     property Name: string read m_szName write m_szName;
+    property LMType: Cardinal read m_nLMType write m_nLMType;
     property Batches: Byte read m_nBatches write m_nBatches;
     property Frames: Word read m_nFrames write m_nFrames;
     property PolyRefsList: TFPObjectList read m_pPolyRefs write m_pPolyRefs;

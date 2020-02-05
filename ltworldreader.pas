@@ -390,6 +390,7 @@ procedure TLTWorldReader.ReadRenderData;
 var i, j, k, n: Cardinal;
     anTempArray: TDynByteArray;
     nTempCardinal: Cardinal = 0;
+    nLMType: Cardinal = 0;
     nBatches: Byte = 0;
     nFrames: Word = 0;
     pAnim: TLMAnim;
@@ -422,12 +423,13 @@ begin
       m_pMemoryStream.Read(szAnimName[1], nNameLen);
       pAnim.Name := szAnimName;
 
-      m_pMemoryStream.Read(nTempCardinal, 4);
+      m_pMemoryStream.Read(nLMType, 4);
       m_pMemoryStream.Read(nBatches, 1);
       m_pMemoryStream.Read(nFrames, 2);
 
       pAnim.Batches := nBatches;
       pAnim.Frames := nFrames;
+      pAnim.LMType := nLMType;
 
       // Somekind of indices? LMPolyRef?
       if pAnim.Frames > 0 then
@@ -453,23 +455,39 @@ begin
           begin
             for k := 0 to pAnim.Frames - 1 do
             begin
+
               pFrame := TLMFrame.Create;
               AssignWidthAndHeightToLMFrame(pAnim, k, pFrame);
 
               m_pMemoryStream.Read(pFrame.m_nSize, 2);
+
               // Skip zero length
               if pFrame.m_nSize > 0 then
               begin
+                //if pFrame.m_nSize < 4 then
+                //  Logger.WLog(LM_WARN, 'LMFrame[' + IntToStr(k) + '] has non-zero length < 4');
+
                 SetLength(pFrame.m_anData, pFrame.m_nSize);
                 m_pMemoryStream.Read(pFrame.m_anData[0], pFrame.m_nSize);
 
-                pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray{%H-});
+                if pAnim.LMType > 0 then
+                begin
+                  pFrame.m_nDecSize := DecompressShadowMap(pFrame.m_anData, pFrame.m_nSize, anTempArray);
+                  SetLength(pFrame.m_anDecData, pFrame.m_nDecSize * 4);
+                  ConvertShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData);
+                  pFrame.m_nDecSize := pFrame.m_nDecSize * 4;
+                end
+                else
+                begin
+                  pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray);
+                  SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
+                  Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
+                end;
+
                 if pFrame.m_nDecSize <> pFrame.m_nWidth * pFrame.m_nHeight * 4 then
                 begin
                   Logger.WLog(LM_WARN, Format('Discrepancy in LMFrame[%d] uncompressed size! Uncompressed: %d, Predicted: %d', [k, pFrame.m_nDecSize, pFrame.m_nWidth * pFrame.m_nHeight * 4]));
                 end;
-                SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
-                Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
 
                 // Test
                 //FillByte(anTempArray[0], 4096, 0);

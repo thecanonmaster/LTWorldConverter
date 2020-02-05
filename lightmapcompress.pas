@@ -10,13 +10,15 @@ uses
 const
   LIGHTMAP_MAX_DATA_SIZE = 4096;
 
-function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+//function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function CompressLMData(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
 function DecompressLMData(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+function DecompressShadowMap(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+procedure ConvertShadowMap(anSource: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
 
 implementation
 
-function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+{function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 var nCurrPos, nRunLen, nCurrPel: Cardinal;
     nCurrOut: Cardinal;
     nTag: Byte;
@@ -49,7 +51,7 @@ begin
   end;
 
   Result := nCurrOut - 3;
-end;
+end;  }
 
 function CompressLMData(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
 var anDWData: TDynCardinalArray;
@@ -151,6 +153,60 @@ begin
   end;
 
   Result := 0;
+end;
+
+function DecompressShadowMap(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+var nCurrPos, nOutPos, nTag, nSwitch, nDelta: Cardinal;
+    anMap: array[0..1] of Byte = (0, 255);
+    nBYValue: Cardinal;
+    nDWValue: Cardinal;
+    nDWCopyCount: Cardinal;
+begin
+  nCurrPos := 0;
+  nOutPos := 0;
+  nSwitch := 0;
+
+  while nDataLen > 0 do
+  begin
+    nTag := anCompressed[nCurrPos];
+
+    if nTag > 0 then
+    begin
+      nBYValue := 0;
+      nDWValue := 0;
+
+      PByte(@nBYValue)^ := anMap[nSwitch];
+      (PByte(@nBYValue) + 1)^ := anMap[nSwitch];
+      nDWValue := nBYValue shl 16;
+      PWord(@nDWValue)^ := nBYValue;
+      nDWCopyCount := nTag shr 2;
+      FillDWord(anOut[nOutPos], nDWCopyCount, nDWValue);
+      nDelta := nOutPos + 4 * nDWCopyCount;
+      FillByte(anOut[nDelta], (nTag and 3), PByte(@nBYValue)^);
+      nOutPos := nDelta + (nTag and 3); //nTag;
+    end;
+
+    if nSwitch = 0 then nSwitch := 1 else nSwitch := 0;
+
+    Dec(nDataLen, 1);
+    Inc(nCurrPos, 1);
+  end;
+
+  //Move(anOut[0], anOut[nOutPos], nOutPos);
+  //Move(anOut[0], anOut[nOutPos shl 1], nOutPos shl 1);
+  //Result := nOutPos * 4;
+  Result := nOutPos;
+end;
+
+procedure ConvertShadowMap(anSource: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+var i: Cardinal;
+    anDWData: TDynCardinalArray;
+begin
+  anDWData := TDynCardinalArray(anOut);
+  for i := 0 to nDataLen - 1 do
+  begin
+    anDWData[i] := (anSource[i]) + (anSource[i] shl 8) + (anSource[i] shl 16);
+  end;
 end;
 
 
