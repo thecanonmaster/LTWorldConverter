@@ -479,6 +479,7 @@ begin
   for i := 0 to m_nBatches - 1 do
   begin
     MS := TMemoryStream.Create;
+    MS.WriteDWord(m_nLMType);
     pBatch := TLMBatch(m_pBatches.Items[i]);
     CreateFramesLandscape(anBuffer{%H-}, pBatch, nWidth, nHeight, MS);
 
