@@ -43,8 +43,11 @@ type
   protected
   public
     procedure ReadWorld;
+
     procedure RemoveWorldModel(szName: string);
     procedure RemoveWorldObject(szName: string);
+    function FindWorldObject(szName: string): TLTWorldObject;
+    function GetLightDWordColor(szLightAnimName: string): Cardinal;
     procedure MoveWorldModel(szName: string; nToIndex: Integer);
 
     property Header: TWorldHeader read WorldHeader write WorldHeader;
@@ -472,9 +475,9 @@ begin
 
                 if pAnim.LMType > 0 then
                 begin
-                  pFrame.m_nDecSize := DecompressShadowMap(pFrame.m_anData, pFrame.m_nSize, anTempArray);
+                  pFrame.m_nDecSize := DecompressShadowMapDBG(pFrame.m_anData, pFrame.m_nSize, anTempArray);
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize * 4);
-                  ConvertShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData);
+                  ExpandShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData, GetLightDWordColor(pAnim.Name));
                   pFrame.m_nDecSize := pFrame.m_nDecSize * 4;
                 end
                 else
@@ -638,6 +641,29 @@ begin
       Exit;
     end;
   end;
+end;
+
+function TLTWorldReader.FindWorldObject(szName: string): TLTWorldObject;
+var i: Cardinal;
+    pObject: TLTWorldObject;
+begin
+  for i := 0 to ObjectList.nNumObjects - 1 do
+  begin
+    pObject := TLTWorldObject(WorldObjectList.pObjectList.Items[i]);
+    if pObject.GetObjectName = szName then
+    begin
+      Exit(pObject);
+    end;
+  end;
+end;
+
+function TLTWorldReader.GetLightDWordColor(szLightAnimName: string): Cardinal;
+var szObjectName: string;
+    vColor: LTVector;
+begin
+  szObjectName := Copy(szLightAnimName, 1, Length(szLightAnimName) - 4);
+  vColor := FindWorldObject(szObjectName).GetProperty('Color').DataVec;
+  Result := (Trunc(vColor.z)) + (Trunc(vColor.y) shl 8) + (Trunc(vColor.x) shl 16);
 end;
 
 procedure TLTWorldReader.MoveWorldModel(szName: string; nToIndex: Integer);

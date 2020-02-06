@@ -74,6 +74,7 @@ type
     procedure WritePropBool(szName: string; nData: Byte);
     procedure WritePropRotation(szName: string; rData: LTRotation);
     function GetObjectName: string;
+    function GetProperty(szName: string): TLTWorldObjectProperty;
     procedure CreateProperty(nCode: Byte; szName: string; pData: Pointer);
     procedure ReadObject(FS: TMemoryStream);
     constructor Create; virtual;
@@ -166,6 +167,16 @@ begin
       (TLTWorldObjectProperty(m_pPropertyList.Items[i]).PropCode = PT_STRING) then
       Exit(TLTWorldObjectProperty(m_pPropertyList.Items[i]).DataStr);
     end;
+  end;
+end;
+
+function TLTWorldObject.GetProperty(szName: string): TLTWorldObjectProperty;
+var i: Cardinal;
+begin
+  for i := 0 to m_pPropertyList.Count - 1 do
+  begin
+    if (TLTWorldObjectProperty(m_pPropertyList.Items[i]).PropName = szName) then
+      Exit(TLTWorldObjectProperty(m_pPropertyList.Items[i]));
   end;
 end;
 

@@ -12,9 +12,12 @@ const
 
 //function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function CompressLMData(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
+function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
 function DecompressLMData(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function DecompressShadowMap(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
-procedure ConvertShadowMap(anSource: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+function DecompressShadowMapDBG(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+procedure ExpandShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray; nFillColor: Cardinal);
+procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
 
 implementation
 
@@ -104,6 +107,53 @@ begin
     end;
     Inc(nCurrPos, 1);
   end;
+  Result := nOutPos;
+end;
+
+function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
+var anDWData: TDynCardinalArray;
+    i, nPixel, nSwitch, nBYValue, nOutPos: Cardinal;
+begin
+  if (nWidth > 32) or (nHeight > 32) then
+  begin
+    WLogStrWarn(Format('ShadowMap width or height larger than allowed (%d x %d)', [nWidth, nHeight]));
+    Exit(0);
+  end;
+
+  anDWData := TDynCardinalArray(anData);
+  nSwitch := 0;
+  nBYValue := 0;
+  nOutPos := 0;
+
+  for i := 0 to nWidth * nHeight {%H-}- 1 do
+  begin
+    if anDWData[i] <> 0 then nPixel := 1 else nPixel := 0;
+    if nPixel = nSwitch then
+    begin
+      Inc(nBYValue, 1);
+      if nBYValue = 255 then
+      begin
+        anOut[nOutPos] := 255;
+        Inc(nOutPos, 1);
+        if nSwitch = 0 then nSwitch := 1 else nSwitch := 0;
+        nBYValue := 0;
+      end;
+    end
+    else
+    begin
+      anOut[nOutPos] := nBYValue;
+      Inc(nOutPos, 1);
+      if nSwitch = 0 then nSwitch := 1 else nSwitch := 0;
+      nBYValue := 1;
+    end;
+  end;
+
+  if nBYValue > 0 then
+  begin
+    anOut[nOutPos] := nBYValue;
+    Inc(nOutPos, 1);
+  end;
+
   Result := nOutPos;
 end;
 
@@ -198,14 +248,61 @@ begin
   Result := nOutPos;
 end;
 
-procedure ConvertShadowMap(anSource: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+function DecompressShadowMapDBG(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
+var nCurrPos, nOutPos, nTag, nSwitch: Cardinal;
+    anMap: array[0..1] of Byte = (0, 255);
+    nBYValue: Byte;
+begin
+  nCurrPos := 0;
+  nOutPos := 0;
+  nSwitch := 0;
+
+  while nDataLen > 0 do
+  begin
+    nTag := anCompressed[nCurrPos];
+
+    nBYValue := anMap[nSwitch];
+    FillByte(anOut[nOutPos], nTag, nBYValue);
+    Inc(nOutPos, nTag);
+    nTag := 0;
+    if nSwitch = 0 then nSwitch := 1 else nSwitch := 0;
+
+    Dec(nDataLen, 1);
+    Inc(nCurrPos, 1);
+  end;
+
+  Result := nOutPos;
+end;
+
+procedure ExpandShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray; nFillColor: Cardinal);
 var i: Cardinal;
     anDWData: TDynCardinalArray;
 begin
   anDWData := TDynCardinalArray(anOut);
   for i := 0 to nDataLen - 1 do
   begin
-    anDWData[i] := (anSource[i]) + (anSource[i] shl 8) + (anSource[i] shl 16);
+    if anData[i] = 0 then
+    begin
+      anDWData[i] := 0;
+    end
+    else
+    begin
+      //anDWData[i] := (anSource[i]) + (anSource[i] shl 8) + (anSource[i] shl 16);
+      anDWData[i] := nFillColor;
+    end;
+  end;
+end;
+
+procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+var i: Cardinal;
+    anDWData: TDynCardinalArray;
+    nPixel: Byte;
+begin
+  anDWData := TDynCardinalArray(anData);
+  for i := 0 to nDataLen - 1 do
+  begin
+    nPixel := (PByte(@anDWData[i]) + 4)^;
+    if nPixel > 0 then anOut[i] := $FF else anOut[i] := 0;
   end;
 end;
 
