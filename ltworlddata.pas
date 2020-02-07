@@ -235,12 +235,14 @@ type
   public
     m_nSize: Word;
     m_nDecSize: Word;
+    m_nReSize: Word;
     m_nWidth: Word;
     m_nHeight: Word;
     m_nLandscapeX: Word;
     m_nLandscapeY: Word;
     m_anData: TDynByteArray;
     m_anDecData: TDynByteArray;
+    m_anReData: TDynByteArray;
     procedure SwapRB;
     constructor Create; virtual;
     destructor Destroy; override;
@@ -266,8 +268,6 @@ type
     m_pWorldPoly: TLTWorldPoly;
   end;
 
-  { TLTLightAnim }
-
   { TLMAnim }
 
   TLMAnim = class(TObject)
@@ -280,6 +280,8 @@ type
     m_pBatches: TFPObjectList;
     procedure CreateFramesLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
     procedure CreatePolyDataLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
+    procedure LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word);
+    procedure LoadPolyDataFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray);
   public
     property Name: string read m_szName write m_szName;
     property LMType: Cardinal read m_nLMType write m_nLMType;
@@ -288,6 +290,7 @@ type
     property PolyRefsList: TFPObjectList read m_pPolyRefs write m_pPolyRefs;
     property BatchesList: TFPObjectList read m_pBatches write m_pBatches;
     procedure SaveBatchesOnDisk;
+    procedure LoadBatchesFromDisk;
     constructor Create; virtual;
     destructor Destroy; override;
   end;
@@ -333,6 +336,7 @@ constructor TLMFrame.Create;
 begin
   m_nSize := 0;
   m_nDecSize := 0;
+  m_nReSize := 0;
 end;
 
 destructor TLMFrame.Destroy;
@@ -340,6 +344,7 @@ begin
   inherited Destroy;
   if m_nSize > 0 then SetLength(m_anData, 0);
   if m_nDecSize > 0 then SetLength(m_anDecData, 0);
+  if m_nReSize > 0 then SetLength(m_anReData, 0);
 end;
 
 { TLMBatch }
@@ -366,7 +371,6 @@ var i: Cardinal;
     nLineCounter: Cardinal = 0;
     bFinalLine: Boolean = False;
 begin
-  MS.WriteWord(m_nFrames);
   nLineWidth := 0;
   nLineHeight := 0;
 
@@ -374,11 +378,23 @@ begin
   begin
     pFrame := TLMFrame(pBatch.m_pFrames.Items[i]);
 
+    MS.WriteWord(pFrame.m_nDecSize);
     MS.WriteWord(pFrame.m_nWidth);
     MS.WriteWord(pFrame.m_nHeight);
 
+    // test
+    {if (m_szName = 'StrobeWaveLightFX0__LA') and (i = 3542) then
+    begin
+      SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000.tga', 4, True, False);
+      Sleep(0);
+    end;}
+
     if pFrame.m_nSize = 0 then
+    begin
+      MS.WriteWord(0);
+      MS.WriteWord(0);
       Continue;
+    end;
 
     if nLineCounter < LANDSCAPE_LIGHTMAPS_PER_LINE then
     begin
@@ -396,6 +412,11 @@ begin
     end
     else
     begin
+      Inc(nLineWidth, pFrame.m_nWidth);
+
+      if pFrame.m_nHeight > nLineHeight then
+        nLineHeight := pFrame.m_nHeight;
+
       pFrame.m_nLandscapeX := nLineWidth - pFrame.m_nWidth;
       pFrame.m_nLandscapeY := nFullHeight;
 
@@ -433,6 +454,23 @@ begin
     SimpleBlt32(TDynCardinalArray(Buffer), TDynCardinalArray(pFrame.m_anDecData),
       nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
 
+    // test
+    {if (m_szName = 'StrobeWaveLightFX0__LA') and (i = 3541) then
+    begin
+      SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000SAVE.tga', 4, True, False);
+      SaveArrayToTGA(Buffer, nFullWidth, nFullHeight, '0001SAVE.tga', 4, True, False);
+      Sleep(0);
+    end; }
+
+    // SimpleReverseBlt32 test {
+    {SetLength(pFrame.m_anReData, pFrame.m_nDecSize);
+    SimpleReverseBlt32(TDynCardinalArray(Buffer), TDynCardinalArray(pFrame.m_anReData),
+      nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
+
+    if CompareDynArrays(pFrame.m_anDecData, pFrame.m_anReData, pFrame.m_nDecSize) > -1 then
+      WriteLn('1111111111111111111111111111'); }
+    // SimpleReverseBlt32 test }
+
     {Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 0] := $FF;
     Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 1] := $FF;
     Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 2] := $FF;}
@@ -468,18 +506,75 @@ begin
   end;
 end;
 
+procedure TLMAnim.LoadPolyDataFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray);
+var i: Cardinal;
+    pPolyData: TLMFramePolyData;
+    nPos: Cardinal = 0;
+    nDataSize: Cardinal;
+begin
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pPolyData := TLMFramePolyData.Create;
+    pPolyData.m_nVertices := MS.ReadByte;
+
+    nDataSize := pPolyData.m_nVertices * 3;
+    SetLength(pPolyData.m_anData, nDataSize);
+    Move(anBuffer[nPos], pPolyData.m_anData[0], nDataSize);
+    nPos := nPos + nDataSize;
+
+    pBatch.m_pFramePolyData.Add(pPolyData);
+  end;
+end;
+
+procedure TLMAnim.LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word);
+var i: Cardinal;
+    pFrame: TLMFrame;
+begin
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pFrame := TLMFrame.Create;
+    pFrame.m_nDecSize := MS.ReadWord;
+    pFrame.m_nWidth := MS.ReadWord;
+    pFrame.m_nHeight := MS.ReadWord;
+    pFrame.m_nLandscapeX := MS.ReadWord;
+    pFrame.m_nLandscapeY := MS.ReadWord;
+
+    //pFrame.m_nDecSize := pFrame.m_nWidth * pFrame.m_nHeight * 4;
+    SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
+
+    if pFrame.m_nDecSize > 0 then
+    begin
+      SimpleReverseBlt32(TDynCardinalArray(anBuffer), TDynCardinalArray(pFrame.m_anDecData),
+        nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
+    end;
+
+    pBatch.m_pFrames.Add(pFrame);
+  end;
+end;
+
 procedure TLMAnim.SaveBatchesOnDisk;
 var i: Cardinal;
     anBuffer: TDynByteArray;
     nWidth: Word = 0;
     nHeight: Word = 0;
     pBatch: TLMBatch;
+    pPolyRef: TLMPolyRef;
     MS: TMemoryStream;
 begin
+  MS := TMemoryStream.Create;
+  MS.WriteDWord(m_nLMType);
+  MS.WriteByte(m_nBatches);
+  MS.WriteWord(m_nFrames);
+
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pPolyRef := TLMPolyRef(m_pPolyRefs.Items[i]);
+    MS.WriteWord(pPolyRef.m_nModelIndex);
+    MS.WriteWord(pPolyRef.m_nPolyIndex);
+  end;
+
   for i := 0 to m_nBatches - 1 do
   begin
-    MS := TMemoryStream.Create;
-    MS.WriteDWord(m_nLMType);
     pBatch := TLMBatch(m_pBatches.Items[i]);
     CreateFramesLandscape(anBuffer{%H-}, pBatch, nWidth, nHeight, MS);
 
@@ -494,9 +589,58 @@ begin
       SaveArrayToTGA(anBuffer, nWidth, nHeight, CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '_polydata.tga', 3, False, False);
 
     SetLength(anBuffer, 0);
-    MS.SaveToFile(CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '.index');
-    MS.Free;
   end;
+
+  MS.SaveToFile(CPData.DumpsDir + CPData.Sep + m_szName + '.index');
+  MS.Free;
+end;
+
+procedure TLMAnim.LoadBatchesFromDisk;
+var MS: TMemoryStream;
+    i: Cardinal;
+    pPolyRef: TLMPolyRef;
+    pBatch: TLMBatch;
+    anBuffer: TDynByteArray;
+    nFullWidth: Word = 0;
+    nFullHeight: Word = 0;
+    nChannels: Byte = 0;
+    szLMFile, szPDFile: string;
+begin
+  MS := TMemoryStream.Create;
+  MS.LoadFromFile(CPData.DumpsDir + CPData.Sep + m_szName + '.index');
+
+  m_nLMType := MS.ReadDWord;
+  m_nBatches := MS.ReadByte;
+  m_nFrames := MS.ReadWord;
+
+  for i := 0 to m_nFrames - 1 do
+  begin
+    pPolyRef := TLMPolyRef.Create;
+    pPolyRef.m_nModelIndex := MS.ReadWord;
+    pPolyRef.m_nPolyIndex := MS.ReadWord;
+    m_pPolyRefs.Add(pPolyRef);
+  end;
+
+  for i := 0 to m_nBatches - 1 do
+  begin
+    pBatch := TLMBatch.Create;
+
+    szLMFile := CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '.tga';
+    szPDFile := CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '_polydata.tga';
+
+    if FileExists(szLMFile) then
+      LoadArrayFromTGA(anBuffer{%H-}, nFullWidth, nFullHeight, szLMFile, nChannels, True, False);
+    LoadFramesFromStream(pBatch, MS, anBuffer, nFullWidth);
+
+    if FileExists(szPDFile) then
+      LoadArrayFromTGA(anBuffer{%H-}, nFullWidth, nFullHeight, szPDFile, nChannels, False, False);
+    LoadPolyDataFromStream(pBatch, MS, anBuffer);
+
+    m_pBatches.Add(pBatch);
+  end;
+
+  SetLength(anBuffer, 0);
+  MS.Free;
 end;
 
 constructor TLMAnim.Create;
@@ -589,10 +733,10 @@ begin
   SetLength(m_szWorldName, nNameLen);
   FS.Read(m_szWorldName[1], nNameLen);
 
-  WriteLn('--- Loading: ', m_szWorldName);
+  WriteLn('--- Loading BSP: ', m_szWorldName);
   nTemp := Logger.RootLevel;
   Logger.RootLevel := LM_INFO;
-  WLogStr('--- Loading: ' + m_szWorldName);
+  WLogStr('--- Loading BSP: ' + m_szWorldName);
   Logger.RootLevel := nTemp;
 
   FS.Read(m_nPoints, 4);

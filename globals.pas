@@ -24,7 +24,7 @@ var
   g_szGeometrySource: string;
   g_bDumpNodes: Boolean;
   //g_bIgnoreObjects: Boolean;
-  g_bReadLightAnims: Boolean;
+  g_szLightAnimsJob: string;
   g_bDebugProps: Boolean;
 
 procedure WLogReal(S: string; F: LTFloat);
@@ -36,8 +36,11 @@ procedure WLogStrWarn(S: string);
 procedure SaveArrayToFile(Buffer: TDynByteArray; nSize: Cardinal; szFilename: string);
 procedure SaveArrayToPPM(Buffer: TDynByteArray; nWidth: Word; nHeight: Word; szFilename: string);
 procedure SaveArrayToTGA(Buffer: TDynByteArray; nWidth: Word; nHeight: Word; szFilename: string; nChannels: Byte; bSolid: Boolean; bSwapRB: Boolean);
+function LoadArrayFromTGA(var Buffer: TDynByteArray; var nWidth: Word; var nHeight: Word; szFilename: string; var nChannels: Byte; bZeroAlpha: Boolean; bSwapRB: Boolean): Cardinal;
 procedure DynArray_MemSet32(Buffer: TDynCardinalArray; nPosition: Cardinal; nValue: Cardinal; nCount: Cardinal);
 procedure SimpleBlt32(Dest: TDynCardinalArray; Source: TDynCardinalArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
+procedure SimpleReverseBlt32(Source: TDynCardinalArray; Dest: TDynCardinalArray; nSourceWidth: Word; nDestWidth: Word; nDestHeight: Word; nX: Word; nY: Word);
+function CompareDynArrays(anLeft: TDynByteArray; anRight: TDynByteArray; nLength: Cardinal): Integer;
 
 implementation
 
@@ -148,12 +151,75 @@ begin
   MS.Free;
 end;
 
+function LoadArrayFromTGA(var Buffer: TDynByteArray; var nWidth: Word; var nHeight: Word; szFilename: string; var nChannels: Byte; bZeroAlpha: Boolean; bSwapRB: Boolean): Cardinal;
+var MS: TMemoryStream;
+    anHeader: array[0..17] of Byte;
+    i: Cardinal;
+begin
+  MS := TMemoryStream.Create;
+  MS.LoadFromFile(szFilename);
+  MS.ReadBuffer({%H-}anHeader[0], 18);
+
+  nWidth := PWord(@anHeader[12])^;
+  nHeight := PWord(@anHeader[14])^;
+  nChannels := anHeader[16] div 8;
+
+  Result := nWidth * nHeight * nChannels;
+  SetLength(Buffer, Result);
+
+  i := 0;
+  while i < Result do
+  begin
+    if bSwapRB then
+    begin
+      Buffer[i + 0] := MS.ReadByte(); // R
+      Buffer[i + 1] := MS.ReadByte(); // G
+      Buffer[i + 2] := MS.ReadByte(); // B
+    end
+    else
+    begin
+      Buffer[i + 2] := MS.ReadByte(); // B
+      Buffer[i + 1] := MS.ReadByte(); // G
+      Buffer[i + 0] := MS.ReadByte(); // R
+    end;
+
+    if nChannels = 4 then
+    begin
+      Buffer[i + 3] := MS.ReadByte(); // A
+      if bZeroAlpha then Buffer[i + 3] := 0;
+    end;
+
+    Inc(i, nChannels);
+  end;
+
+  MS.Free;
+end;
+
 procedure SimpleBlt32(Dest: TDynCardinalArray; Source: TDynCardinalArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
 var i: Word;
 begin
   for i := 0 to nSourceHeight - 1 do
   begin
     Move(Source[i * nSourceWidth], Dest[(nY * nDestWidth + nX) + (nDestWidth * i)], nSourceWidth * 4);
+  end;
+end;
+
+procedure SimpleReverseBlt32(Source: TDynCardinalArray; Dest: TDynCardinalArray; nSourceWidth: Word; nDestWidth: Word; nDestHeight: Word; nX: Word; nY: Word);
+var i: Word;
+begin
+  for i := 0 to nDestHeight - 1 do
+  begin
+    Move(Source[(nY * nSourceWidth + nX) + (nSourceWidth * i)], Dest[i * nDestWidth], nDestWidth * 4);
+  end;
+end;
+
+function CompareDynArrays(anLeft: TDynByteArray; anRight: TDynByteArray; nLength: Cardinal): Integer;
+var i: Integer;
+begin
+  Result := -1;
+  for i := 0 to nLength - 1 do
+  begin
+    if anLeft[i] <> anRight[i] then Exit(i);
   end;
 end;
 

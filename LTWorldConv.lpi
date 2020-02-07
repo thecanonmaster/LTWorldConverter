@@ -24,14 +24,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="-f m1s4.dat -g poly -l"/>
+        <CommandLineParams Value="-f dm_verloc.dat -g poly -l load"/>
         <Display Value=""/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="-f m1s4.dat -g poly -l"/>
+            <CommandLineParams Value="-f dm_verloc.dat -g poly -l load"/>
             <Display Value=""/>
           </local>
         </Mode0>

@@ -17,7 +17,7 @@ function DecompressLMData(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut
 function DecompressShadowMap(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function DecompressShadowMapDBG(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 procedure ExpandShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray; nFillColor: Cardinal);
-procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+//procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
 
 implementation
 
@@ -293,7 +293,7 @@ begin
   end;
 end;
 
-procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
+{procedure ShrinkShadowMap(anData: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray);
 var i: Cardinal;
     anDWData: TDynCardinalArray;
     nPixel: Byte;
@@ -304,8 +304,7 @@ begin
     nPixel := (PByte(@anDWData[i]) + 4)^;
     if nPixel > 0 then anOut[i] := $FF else anOut[i] := 0;
   end;
-end;
-
+end;  }
 
 end.
 

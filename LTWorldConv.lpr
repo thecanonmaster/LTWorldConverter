@@ -37,7 +37,7 @@ begin
   g_szGeometrySource := GetOptionValue('s', '');
   g_bDumpNodes := HasOption('n', '');
   //g_bIgnoreObjects := HasOption('i', '');
-  g_bReadLightAnims := HasOption('l', '');
+  g_szLightAnimsJob := GetOptionValue('l', '');
   g_bDebugProps := HasOption('d', '');
 
   if HasOption('o', '') then
@@ -68,7 +68,7 @@ begin
     WriteLn('   -d: "Debug" mode, adds comments into LTA file.');
     WriteLn('   -s: Main geometry source (physics or vis).');
     //WriteLn('   -i: Do not include objects into LTA world file.');
-    WriteLn('   -l: Read lightanims and save to disk.');
+    WriteLn('   -l: Light animations job (save or load).');
     WriteLn('   -o: Log level 0 - 3 (INFO - DEBUG).');
   end;
 

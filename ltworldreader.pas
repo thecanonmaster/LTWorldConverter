@@ -36,6 +36,8 @@ type
     procedure ReadWorldModels;
     procedure ReadRenderData;
 
+    procedure WriteRenderData;
+
     procedure AssignWorldPolyToLMPolyRef(pPolyRef: TLMPolyRef);
     procedure AssignWidthAndHeightToLMFrame(pAnim: TLMAnim; nIndex: Cardinal;
       pFrame: TLMFrame);
@@ -404,6 +406,7 @@ var i, j, k, n: Cardinal;
     nNameLen: Word = 0;
     szAnimName: string;
     slAnimList: TStringList;
+    nTemp: Integer = 0;
 begin
   slAnimList := TStringList.Create;
   SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
@@ -425,6 +428,12 @@ begin
       SetLength(szAnimName, nNameLen);
       m_pMemoryStream.Read(szAnimName[1], nNameLen);
       pAnim.Name := szAnimName;
+
+      WriteLn('--- Reading LA: ', szAnimName);
+      nTemp := Logger.RootLevel;
+      Logger.RootLevel := LM_INFO;
+      WLogStr('--- Reading LA: ' + szAnimName);
+      Logger.RootLevel := nTemp;
 
       m_pMemoryStream.Read(nLMType, 4);
       m_pMemoryStream.Read(nBatches, 1);
@@ -449,6 +458,7 @@ begin
 
       if pAnim.Batches > 0 then
       begin
+
         for j := 0 to pAnim.Batches - 1 do
         begin
           pBatch := TLMBatch.Create;
@@ -479,12 +489,38 @@ begin
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize * 4);
                   ExpandShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData, GetLightDWordColor(pAnim.Name));
                   pFrame.m_nDecSize := pFrame.m_nDecSize * 4;
+
+                  // compression test {
+                  {pFrame.m_nReSize := CompressShadowMapDBG(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
+                  if pFrame.m_nReSize <> pFrame.m_nSize then
+                  begin
+                    WriteLn('pFrame.m_nReSize <> pFrame.m_nSize');
+                  end
+                  else
+                  begin
+                    if CompareDynArrays(pFrame.m_anData, anTempArray, pFrame.m_nSize) > -1 then
+                      WriteLn('pFrame.m_nReSize = pFrame.m_nSize, but data differs!');
+                  end;}
+                  // compression test }
                 end
                 else
                 begin
                   pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray);
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
                   Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
+
+                  // compression test {
+                  {pFrame.m_nReSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
+                  if pFrame.m_nReSize <> pFrame.m_nSize then
+                  begin
+                    WriteLn('pFrame.m_nReSize <> pFrame.m_nSize');
+                  end
+                  else
+                  begin
+                    if CompareDynArrays(pFrame.m_anData, anTempArray, pFrame.m_nSize) > -1 then
+                      WriteLn('pFrame.m_nReSize = pFrame.m_nSize, but data differs!');
+                  end; }
+                  // compression test }
                 end;
 
                 if pFrame.m_nDecSize <> pFrame.m_nWidth * pFrame.m_nHeight * 4 then
@@ -492,82 +528,73 @@ begin
                   Logger.WLog(LM_WARN, Format('Discrepancy in LMFrame[%d] uncompressed size! Uncompressed: %d, Predicted: %d', [k, pFrame.m_nDecSize, pFrame.m_nWidth * pFrame.m_nHeight * 4]));
                 end;
 
-                // Test
-                //FillByte(anTempArray[0], 4096, 0);
-                //pFrame.m_nReSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
-                //SetLength(pFrame.m_anReData, pFrame.m_nReSize);
-                //Move(anTempArray[0], pFrame.m_anReData[0], pFrame.m_nReSize);
-
                 pFrame.SwapRB;
 
-                //if szAnimName = 'StarLightView_Pred1__SV' then
-                //  SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'LM_' + pAnim.Name + '_' + IntToStr(k) + '.tga', 4, True, False);
+                {if k = 822 then
+                begin
+                  SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep +'822_BUG_original.tga', 4, True, False);
+                end;}
+
               end;
               pBatch.FramesList.Add(pFrame);
-
             end;
           end;
-
-          if WorldHeader.nVersion = 70 then
-          begin
-
-            // WorldModels vertex colors? LMFramePolyData?
-            if pAnim.Frames > 0 then
-            begin
-              for k := 0 to pAnim.Frames - 1 do
-              begin
-                pPolyData := TLMFramePolyData.Create;
-
-                m_pMemoryStream.Read(pPolyData.m_nVertices, 1);
-                if pPolyData.m_nVertices > 0 then
-                begin
-
-                  SetLength(pPolyData.m_anData, pPolyData.m_nVertices * 3);
-
-                  for n := 0 to pPolyData.m_nVertices - 1 do
-                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 0], 1); // R
-
-                  for n := 0 to pPolyData.m_nVertices - 1 do
-                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 1], 1); // G
-
-                  for n := 0 to pPolyData.m_nVertices - 1 do
-                    m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 2], 1); // B
-
-                  // Red
-                  {for n := 0 to pPolyData.m_nVertices - 1 do
-                  begin
-                    m_pMemoryStream.Read(pPolyData.m_anR[n], 1);
-                  end;
-                  // Green
-                  for n := 0 to pPolyData.m_nVertices - 1 do
-                  begin
-                    m_pMemoryStream.Read(pPolyData.m_anG[n], 1);
-                  end;
-                  // Blue
-                  for n := 0 to pPolyData.m_nVertices - 1 do
-                  begin
-                    m_pMemoryStream.Read(pPolyData.m_anB[n], 1);
-                  end; }
-
-                end;
-
-                //if szAnimName = 'StarLightView_Pred1__SV' then
-                //  SaveArrayToTGA(pPolyData.m_anData, pPolyData.m_nVertices, 1, CPData.Dir + CPData.Sep + 'dumps' + CPData.Sep + 'LMPD_' + pAnim.Name + '_' + IntToStr(k) + '.tga', 3, False, False);
-
-                pBatch.FramePolyDataList.Add(pPolyData);
-              end;
-            end;
-
-          end;
-
-          pAnim.BatchesList.Add(pBatch);
         end;
+
+        if WorldHeader.nVersion = 70 then
+        begin
+          // WorldModels vertex colors? LMFramePolyData?
+          if pAnim.Frames > 0 then
+          begin
+            for k := 0 to pAnim.Frames - 1 do
+            begin
+              pPolyData := TLMFramePolyData.Create;
+
+              m_pMemoryStream.Read(pPolyData.m_nVertices, 1);
+              if pPolyData.m_nVertices > 0 then
+              begin
+
+                SetLength(pPolyData.m_anData, pPolyData.m_nVertices * 3);
+
+                for n := 0 to pPolyData.m_nVertices - 1 do
+                  m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 0], 1); // R
+
+                for n := 0 to pPolyData.m_nVertices - 1 do
+                  m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 1], 1); // G
+
+                for n := 0 to pPolyData.m_nVertices - 1 do
+                  m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 2], 1); // B
+
+                // Red
+                {for n := 0 to pPolyData.m_nVertices - 1 do
+                begin
+                  m_pMemoryStream.Read(pPolyData.m_anR[n], 1);
+                end;
+                // Green
+                for n := 0 to pPolyData.m_nVertices - 1 do
+                begin
+                  m_pMemoryStream.Read(pPolyData.m_anG[n], 1);
+                end;
+                // Blue
+                for n := 0 to pPolyData.m_nVertices - 1 do
+                begin
+                  m_pMemoryStream.Read(pPolyData.m_anB[n], 1);
+                end; }
+
+              end;
+
+              pBatch.FramePolyDataList.Add(pPolyData);
+            end;
+          end;
+
+        end;
+
+        pAnim.BatchesList.Add(pBatch);
       end;
 
       WorldLMAnimList.pLMAnimList.Add(pAnim);
       slAnimList.Add(pAnim.Name);
       pAnim.SaveBatchesOnDisk;
-
     end;
   end;
 
@@ -576,6 +603,145 @@ begin
   slAnimList.Free;
   //m_pMemoryStream.SaveToFile('1output.dat');
   //Sleep(50000);
+end;
+
+procedure TLTWorldReader.WriteRenderData;
+var nTempCardinal: Cardinal = 0;
+    i, j, k, n: Cardinal;
+    slLightAnims: TStringList;
+    pAnim: TLMAnim;
+    anTempArray: TDynByteArray;
+    pBatch: TLMBatch;
+    pFrame: TLMFrame;
+    pPolyRef: TLMPolyRef;
+    pPolyData: TLMFramePolyData;
+    szAnimName: string;
+    nTemp: Integer = 0;
+begin
+  SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
+
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(nTempCardinal, 4);
+
+  slLightAnims := TStringList.Create;
+  slLightAnims.LoadFromFile(CPData.DumpsDir + CPData.Sep + 'LightAnimList.txt');
+
+  m_pMemoryStream.Write(slLightAnims.Count, 4);
+
+  for i := 0 to slLightAnims.Count - 1 do
+  begin
+    pAnim := TLMAnim.Create;
+    pAnim.Name := slLightAnims.Strings[i];
+    pAnim.LoadBatchesFromDisk;
+
+    szAnimName := pAnim.Name;
+    nTempCardinal := Length(szAnimName);
+
+    WriteLn('--- Writing LA: ', szAnimName);
+    nTemp := Logger.RootLevel;
+    Logger.RootLevel := LM_INFO;
+    WLogStr('--- Writing LA: ' + szAnimName);
+    Logger.RootLevel := nTemp;
+
+    m_pMemoryStream.Write(nTempCardinal, 2);
+    m_pMemoryStream.Write(szAnimName[1], nTempCardinal);
+    m_pMemoryStream.Write(pAnim.LMType, 4);
+    m_pMemoryStream.Write(pAnim.Batches, 1);
+    m_pMemoryStream.Write(pAnim.Frames, 2);
+
+    if pAnim.Frames > 0 then
+    begin
+      for j := 0 to pAnim.Frames - 1 do
+      begin
+        pPolyRef := TLMPolyRef(pAnim.PolyRefsList.Items[j]);
+        m_pMemoryStream.Write(pPolyRef.m_nModelIndex, 2);
+        m_pMemoryStream.Write(pPolyRef.m_nPolyIndex, 2);
+      end;
+    end;
+
+    for j := 0 to pAnim.Batches - 1 do
+    begin
+      pBatch := TLMBatch(pAnim.BatchesList.Items[j]);
+
+      if pAnim.Frames > 0 then
+      begin
+        for k := 0 to pAnim.Frames - 1 do
+        begin
+          pFrame := TLMFrame(pBatch.FramesList.Items[k]);
+
+          if pFrame.m_nDecSize > 0 then
+          begin
+            pFrame.SwapRB;
+
+            if pAnim.LMType > 0 then
+              pFrame.m_nSize := CompressShadowMapDBG(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray)
+            else
+              pFrame.m_nSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
+
+            SetLength(pFrame.m_anData, pFrame.m_nSize);
+            Move(anTempArray[0], pFrame.m_anData[0], pFrame.m_nSize);
+
+            m_pMemoryStream.Write(pFrame.m_nSize, 2);
+            m_pMemoryStream.Write(pFrame.m_anData[0], pFrame.m_nSize);
+          end
+          else
+          begin
+            pFrame.m_nSize := pFrame.m_nDecSize;
+            m_pMemoryStream.Write(pFrame.m_nSize, 2);
+          end;
+
+          // test
+          {if (pAnim.Name = 'StrobeWaveLightFX0__LA') and (k = 3541) then
+          begin
+            pFrame.SwapRB;
+            SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000LOAD.tga', 4, True, False);
+            m_pMemoryStream.SaveToFile(m_szFilename + '_LAUPDATED.dat');
+            Exit;
+          end; }
+
+        end;
+      end;
+
+      {if i = 1 then
+      begin
+        m_pMemoryStream.SaveToFile(m_szFilename + '_LAUPDATED.dat');
+        Exit;
+      end; }
+
+      if WorldHeader.nVersion = 70 then
+      begin
+        if pAnim.Frames > 0 then
+        begin
+
+          for k := 0 to pAnim.Frames - 1 do
+          begin
+            pPolyData := TLMFramePolyData(pBatch.FramePolyDataList.Items[k]);
+            m_pMemoryStream.Write(pPolyData.m_nVertices, 1);
+
+            if pPolyData.m_nVertices > 0 then
+            begin
+              for n := 0 to pPolyData.m_nVertices - 1 do
+                m_pMemoryStream.Write(pPolyData.m_anData[n * 3 + 0], 1); // R
+
+              for n := 0 to pPolyData.m_nVertices - 1 do
+                m_pMemoryStream.Write(pPolyData.m_anData[n * 3 + 1], 1); // G
+
+              for n := 0 to pPolyData.m_nVertices - 1 do
+                m_pMemoryStream.Write(pPolyData.m_anData[n * 3 + 2], 1); // B
+            end;
+          end;
+
+        end;
+      end;
+
+    end;
+  end;
+
+  SetLength(anTempArray, 0);
+  slLightAnims.Free;
+  m_pMemoryStream.SaveToFile(m_szFilename + '_LAUPDATED.dat');
 end;
 
 procedure TLTWorldReader.AssignWorldPolyToLMPolyRef(pPolyRef: TLMPolyRef);
@@ -604,10 +770,15 @@ begin
 
   m_pMemoryStream.Position := WorldHeader.dwObjectDataPos;
   ReadObjects;
-  if g_bReadLightAnims then
+  m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
+  if g_szLightAnimsJob = 'save' then
   begin
-    m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
     ReadRenderData;
+  end
+  else if g_szLightAnimsJob = 'load' then
+  begin
+    m_pMemoryStream.SetSize(WorldHeader.dwRenderDataPos + 16);
+    WriteRenderData;
   end;
 end;
 
