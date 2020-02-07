@@ -382,13 +382,6 @@ begin
     MS.WriteWord(pFrame.m_nWidth);
     MS.WriteWord(pFrame.m_nHeight);
 
-    // test
-    {if (m_szName = 'StrobeWaveLightFX0__LA') and (i = 3542) then
-    begin
-      SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000.tga', 4, True, False);
-      Sleep(0);
-    end;}
-
     if pFrame.m_nSize = 0 then
     begin
       MS.WriteWord(0);
@@ -454,26 +447,6 @@ begin
     SimpleBlt32(TDynCardinalArray(Buffer), TDynCardinalArray(pFrame.m_anDecData),
       nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
 
-    // test
-    {if (m_szName = 'StrobeWaveLightFX0__LA') and (i = 3541) then
-    begin
-      SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000SAVE.tga', 4, True, False);
-      SaveArrayToTGA(Buffer, nFullWidth, nFullHeight, '0001SAVE.tga', 4, True, False);
-      Sleep(0);
-    end; }
-
-    // SimpleReverseBlt32 test {
-    {SetLength(pFrame.m_anReData, pFrame.m_nDecSize);
-    SimpleReverseBlt32(TDynCardinalArray(Buffer), TDynCardinalArray(pFrame.m_anReData),
-      nFullWidth, pFrame.m_nWidth, pFrame.m_nHeight, pFrame.m_nLandscapeX, pFrame.m_nLandscapeY);
-
-    if CompareDynArrays(pFrame.m_anDecData, pFrame.m_anReData, pFrame.m_nDecSize) > -1 then
-      WriteLn('1111111111111111111111111111'); }
-    // SimpleReverseBlt32 test }
-
-    {Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 0] := $FF;
-    Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 1] := $FF;
-    Buffer[((pFrame.m_nLandscapeY * nFullWidth * 4) + pFrame.m_nLandscapeX * 4) + 2] := $FF;}
   end;
 end;
 
@@ -1017,12 +990,6 @@ var i: Cardinal;
     pSurface: TLTWorldSurface;
     nLen: Word;
 begin
-  // test
-  {if m_szWorldName = 'TranslucentWorldModel10' then
-  begin
-    i := 0;
-    WriteLn(IntToHex(FS.Position, 8));
-  end;  }
 
   nLen := 0;
 

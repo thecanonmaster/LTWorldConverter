@@ -530,11 +530,6 @@ begin
 
                 pFrame.SwapRB;
 
-                {if k = 822 then
-                begin
-                  SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep +'822_BUG_original.tga', 4, True, False);
-                end;}
-
               end;
               pBatch.FramesList.Add(pFrame);
             end;
@@ -692,23 +687,8 @@ begin
             m_pMemoryStream.Write(pFrame.m_nSize, 2);
           end;
 
-          // test
-          {if (pAnim.Name = 'StrobeWaveLightFX0__LA') and (k = 3541) then
-          begin
-            pFrame.SwapRB;
-            SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, '0000LOAD.tga', 4, True, False);
-            m_pMemoryStream.SaveToFile(m_szFilename + '_LAUPDATED.dat');
-            Exit;
-          end; }
-
         end;
       end;
-
-      {if i = 1 then
-      begin
-        m_pMemoryStream.SaveToFile(m_szFilename + '_LAUPDATED.dat');
-        Exit;
-      end; }
 
       if WorldHeader.nVersion = 70 then
       begin
