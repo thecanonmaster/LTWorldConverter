@@ -280,7 +280,7 @@ type
     m_pBatches: TFPObjectList;
     procedure CreateFramesLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
     procedure CreatePolyDataLandscape(var Buffer: TDynByteArray; pBatch: TLMBatch; var nFullWidth: Word; var nFullHeight: Word; MS: TMemoryStream);
-    procedure LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word);
+    procedure LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word; bImageExists: Boolean);
     procedure LoadPolyDataFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray);
   public
     property Name: string read m_szName write m_szName;
@@ -499,7 +499,7 @@ begin
   end;
 end;
 
-procedure TLMAnim.LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word);
+procedure TLMAnim.LoadFramesFromStream(pBatch: TLMBatch; MS: TMemoryStream; anBuffer: TDynByteArray; nFullWidth: Word; bImageExists: Boolean);
 var i: Cardinal;
     pFrame: TLMFrame;
 begin
@@ -511,6 +511,13 @@ begin
     pFrame.m_nHeight := MS.ReadWord;
     pFrame.m_nLandscapeX := MS.ReadWord;
     pFrame.m_nLandscapeY := MS.ReadWord;
+
+    if not bImageExists then
+    begin
+      pFrame.m_nDecSize := 0;
+      pFrame.m_nLandscapeX := 0;
+      pFrame.m_nLandscapeY := 0;
+    end;
 
     //pFrame.m_nDecSize := pFrame.m_nWidth * pFrame.m_nHeight * 4;
     SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
@@ -535,6 +542,7 @@ var i: Cardinal;
     MS: TMemoryStream;
 begin
   MS := TMemoryStream.Create;
+
   MS.WriteDWord(m_nLMType);
   MS.WriteByte(m_nBatches);
   MS.WriteWord(m_nFrames);
@@ -578,6 +586,7 @@ var MS: TMemoryStream;
     nFullHeight: Word = 0;
     nChannels: Byte = 0;
     szLMFile, szPDFile: string;
+    bFileExists: Boolean;
 begin
   MS := TMemoryStream.Create;
   MS.LoadFromFile(CPData.DumpsDir + CPData.Sep + m_szName + '.index');
@@ -585,6 +594,9 @@ begin
   m_nLMType := MS.ReadDWord;
   m_nBatches := MS.ReadByte;
   m_nFrames := MS.ReadWord;
+
+  // test
+  if m_szName = 'StarLightView_Marine__SV' then m_nLMType := 1;
 
   for i := 0 to m_nFrames - 1 do
   begin
@@ -601,11 +613,13 @@ begin
     szLMFile := CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '.tga';
     szPDFile := CPData.DumpsDir + CPData.Sep + m_szName + '_' + IntToStr(i) + '_polydata.tga';
 
-    if FileExists(szLMFile) then
+    bFileExists := FileExists(szLMFile);
+    if bFileExists then
       LoadArrayFromTGA(anBuffer{%H-}, nFullWidth, nFullHeight, szLMFile, nChannels, True, False);
-    LoadFramesFromStream(pBatch, MS, anBuffer, nFullWidth);
+    LoadFramesFromStream(pBatch, MS, anBuffer, nFullWidth, bFileExists);
 
-    if FileExists(szPDFile) then
+    bFileExists := FileExists(szPDFile);
+    if bFileExists then
       LoadArrayFromTGA(anBuffer{%H-}, nFullWidth, nFullHeight, szPDFile, nChannels, False, False);
     LoadPolyDataFromStream(pBatch, MS, anBuffer);
 

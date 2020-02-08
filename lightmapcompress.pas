@@ -12,7 +12,7 @@ const
 
 //function DecompressLMDataJP(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function CompressLMData(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
-function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
+function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray; bInvert: Boolean): Cardinal;
 function DecompressLMData(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function DecompressShadowMap(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
 function DecompressShadowMapDBG(anCompressed: TDynByteArray; nDataLen: Cardinal; anOut: TDynByteArray): Cardinal;
@@ -110,7 +110,7 @@ begin
   Result := nOutPos;
 end;
 
-function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray): Cardinal;
+function CompressShadowMapDBG(anData: TDynByteArray; nWidth: Word; nHeight: Word; anOut: TDynByteArray; bInvert: Boolean): Cardinal;
 var anDWData: TDynCardinalArray;
     i, nPixel, nSwitch, nBYValue, nOutPos: Cardinal;
 begin
@@ -127,7 +127,16 @@ begin
 
   for i := 0 to nWidth * nHeight {%H-}- 1 do
   begin
-    if anDWData[i] <> 0 then nPixel := 1 else nPixel := 0;
+
+    if not bInvert then
+    begin
+      if anDWData[i] <> 0 then nPixel := 1 else nPixel := 0;
+    end
+    else
+    begin
+      if anDWData[i] <> 0 then nPixel := 0 else nPixel := 1;
+    end;
+
     if nPixel = nSwitch then
     begin
       Inc(nBYValue, 1);

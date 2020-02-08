@@ -49,7 +49,7 @@ type
     procedure RemoveWorldModel(szName: string);
     procedure RemoveWorldObject(szName: string);
     function FindWorldObject(szName: string): TLTWorldObject;
-    function GetLightDWordColor(szLightAnimName: string): Cardinal;
+    function GetObjectDWordColor(szLightAnimName: string): Cardinal;
     procedure MoveWorldModel(szName: string; nToIndex: Integer);
 
     property Header: TWorldHeader read WorldHeader write WorldHeader;
@@ -487,7 +487,7 @@ begin
                 begin
                   pFrame.m_nDecSize := DecompressShadowMapDBG(pFrame.m_anData, pFrame.m_nSize, anTempArray);
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize * 4);
-                  ExpandShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData, GetLightDWordColor(pAnim.Name));
+                  ExpandShadowMap(anTempArray, pFrame.m_nDecSize, pFrame.m_anDecData, GetObjectDWordColor(pAnim.Name));
                   pFrame.m_nDecSize := pFrame.m_nDecSize * 4;
 
                   // compression test {
@@ -671,7 +671,7 @@ begin
             pFrame.SwapRB;
 
             if pAnim.LMType > 0 then
-              pFrame.m_nSize := CompressShadowMapDBG(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray)
+              pFrame.m_nSize := CompressShadowMapDBG(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray, False)
             else
               pFrame.m_nSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
 
@@ -808,7 +808,7 @@ begin
   end;
 end;
 
-function TLTWorldReader.GetLightDWordColor(szLightAnimName: string): Cardinal;
+function TLTWorldReader.GetObjectDWordColor(szLightAnimName: string): Cardinal;
 var szObjectName: string;
     vColor: LTVector;
 begin
