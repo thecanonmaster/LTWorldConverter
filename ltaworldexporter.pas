@@ -5,7 +5,7 @@ interface
 
 uses
   Classes, SysUtils, ltworldreader, ltworldtypes, ltworldobject, contnrs,
-  ltworlddata, globals, MyLogger, uvtoopq;
+  ltworlddata, globals, MyLogger{, uvtoopq};
 
 const
   
@@ -1309,8 +1309,10 @@ begin
     pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
 
     // test
-    //WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\LMS2\' + IntToStr(pPoly.LMFrameIndex) + '.dtx');
-    WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+    if g_bLightMapTexturesLTA then
+      WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\LMS2\' + IntToStr(pPoly.LMFrameIndex) + '.tga')
+    else
+      WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
 
     WriteArrayEnd(Level + 4);
 

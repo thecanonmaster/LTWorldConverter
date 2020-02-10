@@ -132,6 +132,10 @@ type
   end;
 
   TWorldLMAnimList = record
+    nTotalFrames1: Cardinal;
+    nTotalAnims: Cardinal;
+    nTotalMemory: Cardinal;
+    nTotalFrames2: Cardinal;
     nNumLMAnims: Cardinal;
     pLMAnimList: TFPObjectList;
   end;

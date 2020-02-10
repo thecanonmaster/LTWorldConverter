@@ -396,7 +396,6 @@ end;
 procedure TLTWorldReader.ReadRenderData;
 var i, j, k, n: Cardinal;
     anTempArray: TDynByteArray;
-    nTempCardinal: Cardinal = 0;
     nLMType: Cardinal = 0;
     nBatches: Byte = 0;
     nFrames: Word = 0;
@@ -413,10 +412,10 @@ begin
   slAnimList := TStringList.Create;
   SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
 
-  m_pMemoryStream.Read(nTempCardinal, 4);
-  m_pMemoryStream.Read(nTempCardinal, 4);
-  m_pMemoryStream.Read(nTempCardinal, 4);
-  m_pMemoryStream.Read(nTempCardinal, 4);
+  m_pMemoryStream.Read(WorldLMAnimList.nTotalFrames1, 4);
+  m_pMemoryStream.Read(WorldLMAnimList.nTotalAnims, 4);
+  m_pMemoryStream.Read(WorldLMAnimList.nTotalMemory, 4);
+  m_pMemoryStream.Read(WorldLMAnimList.nTotalFrames2, 4);
   m_pMemoryStream.Read(WorldLMAnimList.nNumLMAnims, 4);
 
   if WorldLMAnimList.nNumLMAnims > 0 then

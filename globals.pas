@@ -27,6 +27,7 @@ var
   g_szLightAnimsJob: string;
   g_bDebugProps: Boolean;
   g_bAdditionalTexturesLTA: Boolean = False;
+  g_bLightMapTexturesLTA: Boolean = False;
 
 procedure WLogReal(S: string; F: LTFloat);
 procedure WLogVec(S: string; V: PLTVector);

@@ -48,6 +48,10 @@ type
     m_vData: LTVector;
   end;
 
+  TLTRelDiskVert = packed record
+    nRelVerts: Word;
+  end;
+
   TLTDiskVert = packed record
     nVerts: Word;
     nDummy1: Byte;
@@ -55,6 +59,7 @@ type
     nDummy3: Byte;
   end;
   TLTDiskVertList = array[0..MAX_WORLDPOLY_VERTS - 1] of TLTDiskVert;
+  TLTRelDiskVertList = array[0..MAX_WORLDPOLY_VERTS - 1] of TLTRelDiskVert;
   TLTNodeIndices = array[0..1] of Cardinal;
 
   TLTWorldNode = class(TObject)
@@ -74,6 +79,8 @@ type
     property Sides: TLTNodeIndices read m_anSides write m_anSides;
     property SidesStatus: TLTNodeIndices read m_anSidesStatus write m_anSidesStatus;
   end;
+
+  { TLTWorldPoly }
 
   TLTWorldPoly = class(TObject)
   private
@@ -99,8 +106,11 @@ type
     m_nSurface: Cardinal;
 
     m_aDiskVerts: TLTDiskVertList;
+    m_aRelDiskVerts: TLTRelDiskVertList;
 
     m_nLMFrameIndex: Cardinal;
+
+    procedure FillRelVerts;
   public
     property Radius: LTFloat read m_fRadius write m_fRadius;
     property Center: LTVector read m_vCenter write m_vCenter;
@@ -116,6 +126,7 @@ type
     property UVData2: LTVector read m_vUV2 write m_vUV2;
     property UVData3: LTVector read m_vUV3 write m_vUV3;
     property DiskVerts: TLTDiskVertList read m_aDiskVerts write m_aDiskVerts;
+    property RelDiskVerts: TLTRelDiskVertList read m_aRelDiskVerts write m_aRelDiskVerts;
 
     property LMFrameIndex: Cardinal read m_nLMFrameIndex write m_nLMFrameIndex;
 
@@ -127,6 +138,7 @@ type
     function GetIndex: Cardinal;
     procedure SetIndex(nIndex: Cardinal);
     procedure ReadPoly(FS: TMemoryStream);
+
     constructor Create; virtual;
     destructor Destroy; override;
   end;
@@ -666,6 +678,7 @@ begin
   FS.Read(m_vUV3, sizeof(LTVector));
 
   FS.Read(m_aDiskVerts[0], SizeOf(TLTDiskVert) * GetNumVertices);
+  FillRelVerts;
 end;
 
 function TLTWorldPoly.GetIndex: Cardinal;
@@ -681,6 +694,15 @@ end;
 procedure TLTWorldPoly.SetNumVertices(nVertices: Cardinal);
 begin
   m_nIndexAndNumVerts := (m_nIndexAndNumVerts and $FFFFFF00) or (nVertices and $FF)
+end;
+
+procedure TLTWorldPoly.FillRelVerts;
+var i: Cardinal;
+begin
+  for i := 0 to m_nLoVerts - 1 do
+  begin
+    m_aRelDiskVerts[i].nRelVerts := i;
+  end;
 end;
 
 function TLTWorldPoly.GetNumVertices: Cardinal;
