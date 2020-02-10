@@ -26,6 +26,7 @@ var
   //g_bIgnoreObjects: Boolean;
   g_szLightAnimsJob: string;
   g_bDebugProps: Boolean;
+  g_bAdditionalTexturesLTA: Boolean = False;
 
 procedure WLogReal(S: string; F: LTFloat);
 procedure WLogVec(S: string; V: PLTVector);

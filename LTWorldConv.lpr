@@ -7,7 +7,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, SysUtils, CustApp, MyCrossPlatform,
-  MyLogger, ltworldreader, ltaworldexporter, globals;
+  MyLogger, ltworldreader, ltaworldexporter, globals, uvtoopq;
 
 type
   TLTWorldConv = class(TCustomApplication)

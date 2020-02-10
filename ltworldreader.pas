@@ -39,8 +39,7 @@ type
     procedure WriteRenderData;
 
     procedure AssignWorldPolyToLMPolyRef(pPolyRef: TLMPolyRef);
-    procedure AssignWidthAndHeightToLMFrame(pAnim: TLMAnim; nIndex: Cardinal;
-      pFrame: TLMFrame);
+    procedure AssignWidthAndHeightToLMFrame(pAnim: TLMAnim; nIndex: Cardinal; pFrame: TLMFrame);
 
   protected
   public
@@ -348,6 +347,9 @@ begin
       WLogVec('| | UV[1]', @pWorldPoly.UVData2);
       WLogVec('| | UV[2]', @pWorldPoly.UVData3);
 
+      WLogInt('| | LoVerts', pWorldPoly.LoVerts);
+      WLogInt('| | HiVerts', pWorldPoly.HiVerts);
+
       szDump := '';
       for k := 0 to pWorldPoly.GetNumVertices - 1 do
       begin
@@ -529,6 +531,10 @@ begin
                 end;
 
                 pFrame.SwapRB;
+
+                // test
+                //SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep + 'lms' + CPData.Sep + IntToStr(k) + '.tga', 4, True, False);
+
 
               end;
               pBatch.FramesList.Add(pFrame);
@@ -737,6 +743,9 @@ begin
   pPoly := TLMPolyRef(pAnim.PolyRefsList.Items[nIndex]).m_pWorldPoly;
   pFrame.m_nWidth := pPoly.LightmapWidth;
   pFrame.m_nHeight := pPoly.LightmapHeight;
+
+  // temp
+  pPoly.LMFrameIndex := nIndex;
 end;
 
 procedure TLTWorldReader.ReadWorld;

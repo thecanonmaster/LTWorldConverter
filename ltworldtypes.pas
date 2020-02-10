@@ -143,6 +143,14 @@ function LTVectorInit(x, y, z: LTFloat): LTVector;
 function LTRotationInit(x, y, z, w: LTFloat): LTRotation;
 function UVToStrC(U: PUVPair): string;
 function FlagsToBool(dwFlags: Cardinal; dwWhat: Cardinal; bUseNot: Boolean = False): Byte;
+procedure VEC_SUB(d: PLTVector; v1: PLTVector; v2: PLTVector);
+function VEC_MAGSQR(v: PLTVector): LTFloat;
+function VEC_MAG(v: PLTVector): LTFloat;
+procedure VEC_NORM(v: PLTVector);
+procedure VEC_CROSS(dest: PLTVector; v1: PLTVector; v2: PLTVector);
+procedure VEC_MULSCALAR(d: PLTVector; v1: PLTVector; s: LTFloat);
+procedure VEC_ADD(d: PLTVector; v1: PLTVector; v2: PLTVector);
+function VEC_DOT(v1: PLTVector; v2: PLTVector): LTFloat;
 
 implementation
 
@@ -204,6 +212,58 @@ begin
     if dwTemp = 0 then Result := 0
     else Result := 1;
   end;
+end;
+
+procedure VEC_SUB(d: PLTVector; v1: PLTVector; v2: PLTVector);
+begin
+  d^.x := v1^.x - v2^.x;
+  d^.y := v1^.y - v2^.y;
+  d^.z := v1^.z - v2^.z;
+end;
+
+function VEC_MAGSQR(v: PLTVector): LTFloat;
+begin
+  Result := v^.x * v^.x + v^.y * v^.y + v^.z * v^.z;
+end;
+
+function VEC_MAG(v: PLTVector): LTFloat;
+begin
+  Result := sqrt(VEC_MAGSQR(v));
+end;
+
+procedure VEC_NORM(v: PLTVector);
+var fTemp: LTFloat;
+begin
+  fTemp := 1.0 / VEC_MAG(v);
+  v^.x := v^.x * fTemp;
+  v^.y := v^.y * fTemp;
+  v^.z := v^.z * fTemp;
+end;
+
+procedure VEC_CROSS(dest: PLTVector; v1: PLTVector; v2: PLTVector);
+begin
+  dest^.x := v2^.y * v1^.z - v2^.z * v1^.y;
+  dest^.y := v2^.z * v1^.x - v2^.x * v1^.z;
+  dest^.z := v2^.x * v1^.y - v2^.y * v1^.x;
+end;
+
+procedure VEC_MULSCALAR(d: PLTVector; v1: PLTVector; s: LTFloat);
+begin
+  d^.x := v1^.x * s;
+  d^.y := v1^.y * s;
+  d^.z := v1^.z * s;
+end;
+
+procedure VEC_ADD(d: PLTVector; v1: PLTVector; v2: PLTVector);
+begin
+  d^.x := v1^.x + v2^.x;
+  d^.y := v1^.y + v2^.y;
+  d^.z := v1^.z + v2^.z;
+end;
+
+function VEC_DOT(v1: PLTVector; v2: PLTVector): LTFloat;
+begin
+  Result := v1^.x * v2^.x + v1^.y * v2^.y + v1^.z * v2^.z;
 end;
 
 end.

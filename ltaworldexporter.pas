@@ -5,7 +5,7 @@ interface
 
 uses
   Classes, SysUtils, ltworldreader, ltworldtypes, ltworldobject, contnrs,
-  ltworlddata, globals, MyLogger;
+  ltworlddata, globals, MyLogger, uvtoopq;
 
 const
   
@@ -1107,16 +1107,19 @@ begin
       WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
 
       WriteNodeStart(Level + 4, NODE_TEXTURES, '');
-      WriteArrayStart(Level + 5, ' 1 ', '');
-      WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
-      vNull := LTVectorInit(0, 0, 0);
-      WriteVector(Level + 7, @vNull);
-      WriteVector(Level + 7, @pPoly.UVData2);
-      WriteVector(Level + 7, @pPoly.UVData3);
-      WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
-      WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
-      WriteArrayEnd(Level + 6);
-      WriteArrayEnd(Level + 5);
+      if g_bAdditionalTexturesLTA then
+      begin
+        WriteArrayStart(Level + 5, ' 1 ', '');
+        WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
+        vNull := LTVectorInit(0, 0, 0);
+        WriteVector(Level + 7, @vNull);
+        WriteVector(Level + 7, @vNull); //@pPoly.UVData2);
+        WriteVector(Level + 7, @vNull); //@pPoly.UVData3);
+        WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
+        WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
+        WriteArrayEnd(Level + 6);
+        WriteArrayEnd(Level + 5);
+      end;
       WriteNodeEnd(Level + 4);
 
       WriteArrayEnd(Level + 3);
@@ -1239,6 +1242,11 @@ var n, j, k: Cardinal;
     pSurface: TLTWorldSurface;
     szPointsList: string;
     vNull: LTVector;
+
+    // test
+    {avPos: array[0..2] of LTVector;
+    afCoords: array[0..5] of LTFloat;
+    vO, vP, vQ: LTVector; }
 begin
   for n := 0 to pModel.Polies - 1 do
   begin
@@ -1254,6 +1262,7 @@ begin
     if pPoly.LoVerts > 0 then
     begin
       WriteArrayStart(Level + 2, ARRAY_POINTLIST, '');
+      //for j := 0 to pPoly.GetNumVertices - 1 do
       for j := 0 to pPoly.LoVerts - 1 do
       begin
         WriteWorldPoint(Level + 3, @TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[j].nVerts]).m_vData);
@@ -1279,12 +1288,30 @@ begin
     WriteGenericProp(Level + 4, PROP_DIST, FormatFloat('0.000000', pPlane.m_fDist));
 
     WriteArrayStart(Level + 4, ARRAY_TEXTUREINFO, '');
+
+    // test
+    {avPos[0] := TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[0].nVerts]).m_vData;
+    avPos[1] := TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[1].nVerts]).m_vData;
+    avPos[2] := TLTWorldVertex(pModel.PointsList.Items[pPoly.DiskVerts[2].nVerts]).m_vData;
+    afCoords[0] := 0.0; afCoords[1] := 0.0;
+    afCoords[2] := 1.0; afCoords[3] := 0.0;
+    afCoords[4] := 1.0; afCoords[5] := 1.0;
+    ConvertUVToOPQ(avPos, afCoords, pPoly.LightmapWidth, pPoly.LightmapHeight, @vO, @vP, @vQ);
+    WriteVector(Level + 5, @vO);
+    WriteVector(Level + 5, @vP);
+    WriteVector(Level + 5, @vQ);  }
+
     WriteVector(Level + 5, @pPoly.UVData1);
     WriteVector(Level + 5, @pPoly.UVData2);
     WriteVector(Level + 5, @pPoly.UVData3);
+
     WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
     pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
+
+    // test
+    //WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\LMS2\' + IntToStr(pPoly.LMFrameIndex) + '.dtx');
     WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+
     WriteArrayEnd(Level + 4);
 
     WriteGenericSet(Level + 4, [PROP_FLAGS]);
@@ -1293,16 +1320,19 @@ begin
     WriteGenericPropStr(Level + 4, PROP_SURFACEKEY, '');
 
     WriteNodeStart(Level + 4, NODE_TEXTURES, '');
-    WriteArrayStart(Level + 5, ' 1 ', '');
-    WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
-    vNull := LTVectorInit(0, 0, 0);
-    WriteVector(Level + 7, @vNull);
-    WriteVector(Level + 7, @pPoly.UVData2);
-    WriteVector(Level + 7, @pPoly.UVData3);
-    WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
-    WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
-    WriteArrayEnd(Level + 6);
-    WriteArrayEnd(Level + 5);
+    if g_bAdditionalTexturesLTA then
+    begin
+      WriteArrayStart(Level + 5, ' 1 ', '');
+      WriteArrayStart(Level + 6, ARRAY_TEXTUREINFO, '');
+      vNull := LTVectorInit(0, 0, 0);
+      WriteVector(Level + 7, @vNull);
+      WriteVector(Level + 7, @vNull); //@pPoly.UVData2);
+      WriteVector(Level + 7, @vNull); //@pPoly.UVData3);
+      WriteGenericProp(Level + 7, PROP_STICKTOPOLY, '1');
+      WriteGenericPropStr(Level + 7, PROP_NAME, 'Default');
+      WriteArrayEnd(Level + 6);
+      WriteArrayEnd(Level + 5);
+    end;
     WriteNodeEnd(Level + 4);
 
 

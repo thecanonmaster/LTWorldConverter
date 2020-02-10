@@ -91,14 +91,16 @@ type
     m_nUnknownNum: Word;
     m_anUnknownList: TDynWordArray;
 
-    m_fUV1: LTVector;
-    m_fUV2: LTVector;
-    m_fUV3: LTVector;
+    m_vUV1: LTVector;
+    m_vUV2: LTVector;
+    m_vUV3: LTVector;
 
     m_nPlane: Cardinal;
     m_nSurface: Cardinal;
 
     m_aDiskVerts: TLTDiskVertList;
+
+    m_nLMFrameIndex: Cardinal;
   public
     property Radius: LTFloat read m_fRadius write m_fRadius;
     property Center: LTVector read m_vCenter write m_vCenter;
@@ -110,10 +112,12 @@ type
     property LoVerts: Byte read m_nLoVerts write m_nLoVerts;
     property HiVerts: Byte read m_nHiVerts write m_nHiVerts;
 
-    property UVData1: LTVector read m_fUV1 write m_fUV1;
-    property UVData2: LTVector read m_fUV2 write m_fUV2;
-    property UVData3: LTVector read m_fUV3 write m_fUV3;
+    property UVData1: LTVector read m_vUV1 write m_vUV1;
+    property UVData2: LTVector read m_vUV2 write m_vUV2;
+    property UVData3: LTVector read m_vUV3 write m_vUV3;
     property DiskVerts: TLTDiskVertList read m_aDiskVerts write m_aDiskVerts;
+
+    property LMFrameIndex: Cardinal read m_nLMFrameIndex write m_nLMFrameIndex;
 
     property IndexAndNumVerts: Cardinal read m_nIndexAndNumVerts write m_nIndexAndNumVerts;
     property Plane: Cardinal read m_nPlane write m_nPlane;
@@ -235,14 +239,12 @@ type
   public
     m_nSize: Word;
     m_nDecSize: Word;
-    m_nReSize: Word;
     m_nWidth: Word;
     m_nHeight: Word;
     m_nLandscapeX: Word;
     m_nLandscapeY: Word;
     m_anData: TDynByteArray;
     m_anDecData: TDynByteArray;
-    m_anReData: TDynByteArray;
     procedure SwapRB;
     constructor Create; virtual;
     destructor Destroy; override;
@@ -336,7 +338,6 @@ constructor TLMFrame.Create;
 begin
   m_nSize := 0;
   m_nDecSize := 0;
-  m_nReSize := 0;
 end;
 
 destructor TLMFrame.Destroy;
@@ -344,7 +345,6 @@ begin
   inherited Destroy;
   if m_nSize > 0 then SetLength(m_anData, 0);
   if m_nDecSize > 0 then SetLength(m_anDecData, 0);
-  if m_nReSize > 0 then SetLength(m_anReData, 0);
 end;
 
 { TLMBatch }
@@ -515,6 +515,8 @@ begin
     if not bImageExists then
     begin
       pFrame.m_nDecSize := 0;
+      pFrame.m_nWidth := 0;
+      pFrame.m_nHeight := 0;
       pFrame.m_nLandscapeX := 0;
       pFrame.m_nLandscapeY := 0;
     end;
@@ -595,9 +597,6 @@ begin
   m_nBatches := MS.ReadByte;
   m_nFrames := MS.ReadWord;
 
-  // test
-  if m_szName = 'StarLightView_Marine__SV' then m_nLMType := 1;
-
   for i := 0 to m_nFrames - 1 do
   begin
     pPolyRef := TLMPolyRef.Create;
@@ -616,7 +615,7 @@ begin
     bFileExists := FileExists(szLMFile);
     if bFileExists then
       LoadArrayFromTGA(anBuffer{%H-}, nFullWidth, nFullHeight, szLMFile, nChannels, True, False);
-    LoadFramesFromStream(pBatch, MS, anBuffer, nFullWidth, bFileExists);
+    LoadFramesFromStream(pBatch, MS, anBuffer, nFullWidth, True);
 
     bFileExists := FileExists(szPDFile);
     if bFileExists then
@@ -662,9 +661,9 @@ begin
   FS.Read(m_nSurface, 4);
   FS.Read(m_nPlane, 4);
 
-  FS.Read(m_fUV1, sizeof(LTVector));
-  FS.Read(m_fUV2, sizeof(LTVector));
-  FS.Read(m_fUV3, sizeof(LTVector));
+  FS.Read(m_vUV1, sizeof(LTVector));
+  FS.Read(m_vUV2, sizeof(LTVector));
+  FS.Read(m_vUV3, sizeof(LTVector));
 
   FS.Read(m_aDiskVerts[0], SizeOf(TLTDiskVert) * GetNumVertices);
 end;
