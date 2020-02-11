@@ -436,6 +436,9 @@ begin
       WLogStr('--- Reading LA: ' + szAnimName);
       Logger.RootLevel := nTemp;
 
+      if g_bLMFramesToSeparateTGA then
+        CreateDir(CPData.DumpsDir + CPData.Sep + szAnimName);
+
       m_pMemoryStream.Read(nLMType, 4);
       m_pMemoryStream.Read(nBatches, 1);
       m_pMemoryStream.Read(nFrames, 2);
@@ -509,7 +512,7 @@ begin
                   pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray);
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
                   Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
-
+                                                                     CreateDir(CPData.Dir + CPData.Sep + 'dumps');
                   // compression test {
                   {pFrame.m_nReSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
                   if pFrame.m_nReSize <> pFrame.m_nSize then
@@ -532,7 +535,8 @@ begin
                 pFrame.SwapRB;
 
                 // test
-                //SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep + 'lms' + CPData.Sep + IntToStr(k) + '.tga', 4, True, False);
+                if g_bLMFramesToSeparateTGA then
+                  SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep + szAnimName + CPData.Sep + IntToStr(k) + '.tga', 4, True, False);
 
 
               end;

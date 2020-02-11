@@ -26,6 +26,8 @@ var
   //g_bIgnoreObjects: Boolean;
   g_szLightAnimsJob: string;
   g_bDebugProps: Boolean;
+
+  g_bLMFramesToSeparateTGA: Boolean = False;
   g_bAdditionalTexturesLTA: Boolean = False;
   g_bLightMapTexturesLTA: Boolean = False;
 

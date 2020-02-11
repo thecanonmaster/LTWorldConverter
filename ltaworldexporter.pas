@@ -1098,7 +1098,12 @@ begin
       WriteVector(Level + 5, @pPoly.UVData3);
       WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
       pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
-      WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+
+      if g_bLightMapTexturesLTA then
+        WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\Lightmaps\' + IntToStr(pPoly.LMFrameIndex) + '.tga')
+      else
+        WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
+
       WriteArrayEnd(Level + 4);
 
       WriteGenericSet(Level + 4, [PROP_FLAGS]);
@@ -1308,9 +1313,8 @@ begin
     WriteGenericProp(Level + 5, PROP_STICKTOPOLY, '1');
     pSurface := TLTWorldSurface(pModel.SurfacesList.Items[pPoly.Surface]);
 
-    // test
     if g_bLightMapTexturesLTA then
-      WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\LMS2\' + IntToStr(pPoly.LMFrameIndex) + '.tga')
+      WriteGenericPropStr(Level + 5, PROP_NAME, 'WorldTextures\Lightmaps\' + IntToStr(pPoly.LMFrameIndex) + '.tga')
     else
       WriteGenericPropStr(Level + 5, PROP_NAME, pModel.TextureNames[pSurface.m_nTexture]);
 
