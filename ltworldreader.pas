@@ -443,6 +443,10 @@ begin
       m_pMemoryStream.Read(nBatches, 1);
       m_pMemoryStream.Read(nFrames, 2);
 
+      if nBatches > 1 then
+        Logger.WLog(LM_WARN, Format('LMAnim "%s" has %d batches!', [szAnimName, nBatches]));
+
+
       pAnim.Batches := nBatches;
       pAnim.Frames := nFrames;
       pAnim.LMType := nLMType;
@@ -512,7 +516,7 @@ begin
                   pFrame.m_nDecSize := DecompressLMData(pFrame.m_anData, pFrame.m_nSize, anTempArray);
                   SetLength(pFrame.m_anDecData, pFrame.m_nDecSize);
                   Move(anTempArray[0], pFrame.m_anDecData[0], pFrame.m_nDecSize);
-                                                                     CreateDir(CPData.Dir + CPData.Sep + 'dumps');
+
                   // compression test {
                   {pFrame.m_nReSize := CompressLMData(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, anTempArray);
                   if pFrame.m_nReSize <> pFrame.m_nSize then

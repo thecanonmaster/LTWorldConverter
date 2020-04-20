@@ -28,6 +28,7 @@ var Filename: string;
     LTAExporter: TLTAWorldExporter;
     szLogLevel: string;
 begin
+  Application.StopOnException := True;
   CreateDir(CPData.Dir + CPData.Sep + 'dumps');
 
   FormatSettings.DecimalSeparator := '.';
