@@ -5,7 +5,7 @@ interface
 
 uses
   Classes, SysUtils, ltworldreader, ltworldtypes, ltworldobject, contnrs,
-  ltworlddata, globals, MyLogger{, uvtoopq};
+  ltworlddata, globals{, MyLogger, uvtoopq};
 
 const
   
@@ -566,7 +566,7 @@ begin
       if (nFlagsTemp <> pSurface.m_nFlags) then
       //or (nUnknownTemp <> pSurface.m_nUnknown1) then
       begin
-        Logger.WLog(LM_WARN, 'WorldModel "' + pBSP.WorldName + '" has different surface flags!');
+        WLogStrWarn('WorldModel "' + pBSP.WorldName + '" has different surface flags!');
         Exit;
       end;
     end;

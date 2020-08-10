@@ -34,7 +34,7 @@ type
     procedure ReadWorldTree;
     procedure ReadObjects;
     procedure ReadWorldModels;
-    procedure ReadRenderData;
+    procedure ReadRenderData(bSave: Boolean);
 
     procedure WriteRenderData;
 
@@ -96,14 +96,14 @@ begin
   m_pMemoryStream.Read(nLen, 4);
   SetLength(WorldProperties, nLen);
   if nLen > 0 then m_pMemoryStream.Read(WorldProperties[1], nLen);
-  m_pMemoryStream.Read(WorldExtents.fUnknown, 4);
+  m_pMemoryStream.Read(WorldExtents.fLMGridSize, 4);
   m_pMemoryStream.Read(WorldExtents.vExtentsMin, sizeof(LTVector));
   m_pMemoryStream.Read(WorldExtents.vExtentsMax, sizeof(LTVector));
   //m_pMemoryStream.Read(WorldExtents.vOffset, sizeof(LTVector));
   // now log it!
   WLogStr('---- WorldProperties and WorldExtents:');
   WLogStr('| Properties = ' + WorldProperties);
-  WLogReal('UnknownReal', WorldExtents.fUnknown);
+  WLogReal('LMGridSize', WorldExtents.fLMGridSize);
   WLogVec('ExtentsMin', @WorldExtents.vExtentsMin);
   WLogVec('ExtentsMax', @WorldExtents.vExtentsMax);
   WLogVec('Offset', @WorldExtents.vOffset);
@@ -202,11 +202,16 @@ begin
 end;
 
 procedure TLTWorldReader.ReadWorldModels;
-var i, j, k, nDummy: Cardinal;
+var i, j, k, l, nDummy: Cardinal;
     pWorldData: TLTWorldData;
     pWorldBSP: TLTWorldBsp;
     pWorldPoly: TLTWorldPoly;
     pWorldNode: TLTWorldNode;
+    pLeaf: TLTLeaf;
+    pLeafList: TLTLeafList;
+    pUserPortal: TLTUserPortal;
+    pPBlockTable: TLTPBlockTable;
+    pPBlockRecord: TLTPBlockRecord;
     anDummy: array[0..$1F] of Byte;
     szDump: string;
     LoadBSPResult: Integer;
@@ -217,7 +222,7 @@ begin
   for i := 0 to WorldModelList.nNumModels - 1 do
   begin
     nDummy := 0;
-    WLogAddr('WorldData starts', m_pMemoryStream.Position);
+    WLogAddr('WorldModel starts', m_pMemoryStream.Position);
     m_pMemoryStream.Read(nDummy, 4);
     m_pMemoryStream.Read(anDummy{%H-}, $20);
     pWorldData := TLTWorldData.Create;
@@ -266,7 +271,7 @@ begin
     // fuck this!
     if LoadBSPResult = -1 then
     begin
-      Logger.WLog(LM_WARN, Format('WorldModel %s is not loaded!', [pWorldBSP.WorldName]));
+      WLogStrWarn(Format('WorldModel %s is not loaded!', [pWorldBSP.WorldName]));
       m_pMemoryStream.Position := pWorldData.NextPos;
       Continue;
     end;
@@ -293,7 +298,7 @@ begin
       WLogVec('| | UV[2]', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_fUV3);
       WLogInt('| | TextureIndex', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nTexture);
       WLogInt('| | SurfaceFlags', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags);
-      WLogStr('| | | SurfaceFlagsBin = ' + binStr(TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags, 32));
+      //WLogStr('| | | SurfaceFlagsBin = ' + binStr(TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags, 32));
       WLogInt('| | Unknown1', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown1);
       WLogInt('| | Unknown2', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown2);
       WLogInt('| | Unknown3', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown3);
@@ -323,7 +328,7 @@ begin
       WLogStr('| | Poly #' + IntToStr(j));
 
       if pWorldPoly.HiVerts > 0 then
-         Logger.WLog(LM_INFO, '| | This poly has additional vertices [' + IntToStr(pWorldPoly.HiVerts) + ']');
+         WLogStr('| | This poly has additional vertices [' + IntToStr(pWorldPoly.HiVerts) + ']');
 
       WLogVec('| | Center', @pWorldPoly.Center);
       //WLogReal('| | Radius', pWorldPoly.Radius);
@@ -363,10 +368,13 @@ begin
     end;
 
     if pWorldBSP.Nodes > 0 then
-    for j := 0 to pWorldBSP.Nodes - 1 do
+    for j := 0 to pWorldBSP.Nodes do
     begin
       pWorldNode := TLTWorldNode(pWorldBSP.NodesList.Items[j]);
-      WLogStr('| | Node #' + IntToStr(j));
+      if j < pWorldBSP.Nodes then
+        WLogStr('| | Node #' + IntToStr(j))
+      else
+        WLogStr('| | RootNode');
       WLogInt('| | Flags', pWorldNode.Flags);
       WLogInt('| | PlaneType', pWorldNode.PlaneType);
       WLogInt('| | PolyIndex', pWorldNode.Poly);
@@ -377,6 +385,95 @@ begin
       WLogInt('| | SidesStatus[1]', pWorldNode.SidesStatus[1]);
       WLogStr('| | ----------------------------------');
     end;
+
+    if pWorldBSP.Leafs > 0 then
+    for j := 0 to pWorldBSP.Leafs - 1 do
+    begin
+      pLeaf := TLTLeaf(pWorldBSP.LeafsList.Items[j]);
+      WLogStr('| | Leaf #' + IntToStr(j));
+      WLogInt('| | NumLeafLists', pLeaf.m_nNumLeafLists);
+      WLogInt('| | LeafListIndex', pLeaf.m_nLeafListIndex);
+      if (pLeaf.m_nNumLeafLists > 0) and (pLeaf.m_nNumLeafLists < $FFFF) then
+      for k := 0 to pLeaf.m_nNumLeafLists - 1 do
+      begin
+        pLeafList := TLTLeafList(pLeaf.m_pLeafLists.Items[k]);
+        WLogStr('| | | LeafList #' + IntToStr(k));
+        WLogInt('| | | PortalId', pLeafList.m_nPortalId);
+        WLogInt('| | | Size', pLeafList.m_nSize);
+        if pLeafList.m_nSize > 0 then
+        begin
+          szDump := '';
+          for l := 0 to pLeafList.m_nSize - 1 do
+          begin
+            szDump:= szDump + IntToStr(pLeafList.m_pContents[l]) + ', ';
+          end;
+          SetLength(szDump, Length(szDump) - 2);
+          WLogStr('| | | | Contents = [ ' + szDump + ' ]');
+        end;
+        WLogStr('| | | ----------------------------------');
+      end;
+
+      WLogInt('| | PoliesCount', pLeaf.m_nPoliesCount);
+      if pLeaf.m_nPoliesCount > 0 then
+      begin
+        szDump := '';
+        for k := 0 to pLeaf.m_nPoliesCount - 1 do
+        begin
+          szDump:= szDump + ' [' + IntToStr(pLeaf.m_pPolies[k * 2]) +
+                                 ', ' + IntToStr(pLeaf.m_pPolies[k * 2 + 1]) + ']';
+        end;
+      end;
+      WLogStr('| | | Polies =' + szDump);
+      WLogInt('| | Cardinal1', pLeaf.m_nCardinal1);
+      WLogStr('| | ----------------------------------');
+    end;
+
+    if pWorldBSP.UserPortals > 0 then
+    for j := 0 to pWorldBSP.UserPortals - 1 do
+    begin
+      pUserPortal := TLTUserPortal(pWorldBSP.UserPortalList.Items[j]);
+      WLogStr('| | UserPortal #' + IntToStr(j));
+      WLogStr('| | | Name = ' + pUserPortal.m_szName);
+      WLogInt('| | Cardinal1', pUserPortal.m_nCardinal1);
+      WLogInt('| | Cardinal2', pUserPortal.m_nCardinal2);
+      WLogInt('| | Word1', pUserPortal.m_nWord1);
+      WLogVec('| | Center', @pUserPortal.m_vCenter);
+      WLogVec('| | Dims', @pUserPortal.m_vDims);
+      WLogStr('| | ----------------------------------');
+    end;
+
+    pPBlockTable := pWorldBSP.PBlockTable;
+    WLogStr('| | PBlockTable');
+    WLogInt('| | Cardinal1', pPBlockTable.m_nCardinal1);
+    WLogInt('| | Cardinal2', pPBlockTable.m_nCardinal2);
+    WLogInt('| | Cardinal3', pPBlockTable.m_nCardinal3);
+    WLogInt('| | Size', pPBlockTable.m_nSize);
+    WLogVec('| | Vector1', @pPBlockTable.m_vVector1);
+    WLogVec('| | Vector2', @pPBlockTable.m_vVector2);
+    if pPBlockTable.m_nSize > 0 then
+    for k := 0 to pPBlockTable.m_nSize - 1 do
+    begin
+      pPBlockRecord :=  TLTPBlockRecord(pPBlockTable.m_pRecords[k]);
+      WLogStr('| | | Record #' + IntToStr(k));
+      WLogInt('| | | Size', pPBlockRecord.m_nSize);
+      WLogInt('| | | Word1', pPBlockRecord.m_nWord1);
+      if pPBlockRecord.m_nSize > 0 then
+      begin
+        szDump := '';
+        for l := 0 to pPBlockRecord.m_nSize - 1 do
+        begin
+          szDump:= szDump + ' [' + IntToStr(pPBlockRecord.m_pContents[l * 6]) +
+                                 ', ' + IntToStr(pPBlockRecord.m_pContents[l * 6 + 1]) +
+                                 ', ' + IntToStr(pPBlockRecord.m_pContents[l * 6 + 2]) +
+                                 ', ' + IntToStr(pPBlockRecord.m_pContents[l * 6 + 3]) +
+                                 ', ' + IntToStr(pPBlockRecord.m_pContents[l * 6 + 4]) +
+                                 ', ' + IntToStr(pPBlockRecord.m_pContents[l * 6 + 5]) + ']';
+        end;
+        WLogStr('| | | | Contents =' + szDump);
+      end;
+      WLogStr('| | | ----------------------------------');
+    end;
+    WLogStr('| | ----------------------------------');
 
     {WLogStr('| | UnknownStruct after Nodes');
     WLogInt('| | Cardinal1', pWorldBSP.UnknownStruct.n1);
@@ -390,10 +487,10 @@ begin
   end;
 
   WLogStr('-----------------------------------');
-  WLogStr('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
+  //WLogStr('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
 end;
 
-procedure TLTWorldReader.ReadRenderData;
+procedure TLTWorldReader.ReadRenderData(bSave: Boolean);
 var i, j, k, n: Cardinal;
     anTempArray: TDynByteArray;
     nLMType: Cardinal = 0;
@@ -407,10 +504,12 @@ var i, j, k, n: Cardinal;
     nNameLen: Word = 0;
     szAnimName: string;
     slAnimList: TStringList;
-    nTemp: Integer = 0;
+    szDump: string;
 begin
   slAnimList := TStringList.Create;
   SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
+
+  WLogStr('---- RenderData');
 
   m_pMemoryStream.Read(WorldLMAnimList.nTotalFrames1, 4);
   m_pMemoryStream.Read(WorldLMAnimList.nTotalAnims, 4);
@@ -418,10 +517,17 @@ begin
   m_pMemoryStream.Read(WorldLMAnimList.nTotalFrames2, 4);
   m_pMemoryStream.Read(WorldLMAnimList.nNumLMAnims, 4);
 
+  WLogInt('TotalFrames', WorldLMAnimList.nTotalFrames1);
+  WLogInt('TotalAnims', WorldLMAnimList.nTotalAnims);
+  WLogInt('TotalMemory', WorldLMAnimList.nTotalMemory);
+  WLogInt('TotalFrames', WorldLMAnimList.nTotalFrames2);
+  WLogInt('NumLMAnims', WorldLMAnimList.nNumLMAnims);
+
   if WorldLMAnimList.nNumLMAnims > 0 then
   begin
     for i := 0 to WorldLMAnimList.nNumLMAnims - 1 do
     begin
+      WLogAddr('LMAnim starts', m_pMemoryStream.Position);
       pAnim := TLMAnim.Create;
 
       // LMAnim, LMPolyRef, LMFrame, uchar, LMFramePolyData
@@ -431,10 +537,6 @@ begin
       pAnim.Name := szAnimName;
 
       WriteLn('--- Reading LA: ', szAnimName);
-      nTemp := Logger.RootLevel;
-      Logger.RootLevel := LM_INFO;
-      WLogStr('--- Reading LA: ' + szAnimName);
-      Logger.RootLevel := nTemp;
 
       if g_bLMFramesToSeparateTGA then
         CreateDir(CPData.DumpsDir + CPData.Sep + szAnimName);
@@ -443,13 +545,18 @@ begin
       m_pMemoryStream.Read(nBatches, 1);
       m_pMemoryStream.Read(nFrames, 2);
 
-      if nBatches > 1 then
-        Logger.WLog(LM_WARN, Format('LMAnim "%s" has %d batches!', [szAnimName, nBatches]));
+      //if nBatches > 1 then
+      //  WLogStrWarn(Format('LMAnim "%s" has %d batches!', [szAnimName, nBatches]));
 
 
       pAnim.Batches := nBatches;
       pAnim.Frames := nFrames;
       pAnim.LMType := nLMType;
+
+      WLogStr('| ' + pAnim.Name);
+      WLogInt('| Batches', pAnim.Batches);
+      WLogInt('| Frames', pAnim.Frames);
+      WLogInt('| LMType', pAnim.LMType);
 
       // Somekind of indices? LMPolyRef?
       if pAnim.Frames > 0 then
@@ -461,6 +568,7 @@ begin
           m_pMemoryStream.Read(pPolyRef.m_nPolyIndex, 2);
           AssignWorldPolyToLMPolyRef(pPolyRef);
           pAnim.PolyRefsList.Add(pPolyRef);
+          WLogStr('| | FrameIndices #' + Format('%d [%d, %d]', [j, pPolyRef.m_nModelIndex, pPolyRef.m_nPolyIndex]));
         end;
       end;
 
@@ -471,11 +579,15 @@ begin
         begin
           pBatch := TLMBatch.Create;
 
+          WLogStr('| | Batch #' + IntToStr(j));
+
           // Main geometry lightmaps? LMFrame?
           if pAnim.Frames > 0 then
           begin
             for k := 0 to pAnim.Frames - 1 do
             begin
+
+              WLogStr('| | | FrameLightmap #' + IntToStr(k));
 
               pFrame := TLMFrame.Create;
               AssignWidthAndHeightToLMFrame(pAnim, k, pFrame);
@@ -533,21 +645,26 @@ begin
 
                 if pFrame.m_nDecSize <> pFrame.m_nWidth * pFrame.m_nHeight * 4 then
                 begin
-                  Logger.WLog(LM_WARN, Format('Discrepancy in LMFrame[%d] uncompressed size! Uncompressed: %d, Predicted: %d', [k, pFrame.m_nDecSize, pFrame.m_nWidth * pFrame.m_nHeight * 4]));
+                  WLogStrWarn(Format('Discrepancy in LMFrame[%d] uncompressed size! Uncompressed: %d, Predicted: %d', [k, pFrame.m_nDecSize, pFrame.m_nWidth * pFrame.m_nHeight * 4]));
                 end;
 
                 pFrame.SwapRB;
 
                 // test
-                if g_bLMFramesToSeparateTGA then
+                if bSave and g_bLMFramesToSeparateTGA then
                   SaveArrayToTGA(pFrame.m_anDecData, pFrame.m_nWidth, pFrame.m_nHeight, CPData.DumpsDir + CPData.Sep + szAnimName + CPData.Sep + IntToStr(k) + '.tga', 4, True, False);
-
 
               end;
               pBatch.FramesList.Add(pFrame);
+
+              WLogStr('| | | | Size = ' + Format('%d (%d)', [pFrame.m_nSize, pFrame.m_nDecSize]));
+              WLogStr('| | | | Dims = ' + Format('%d x %d', [pFrame.m_nWidth, pFrame.m_nHeight]));
+              WLogStr('| | | | Data = ' + DynArray_Sha1Hash(pFrame.m_anData, pFrame.m_nSize));
+              WLogStr('| | | | DecData = ' + DynArray_Sha1Hash(pFrame.m_anDecData, pFrame.m_nDecSize));
+              WLogStr('| | | ----------------------------------');
             end;
           end;
-        end;
+        //end;
 
         if WorldHeader.nVersion = 70 then
         begin
@@ -556,6 +673,8 @@ begin
           begin
             for k := 0 to pAnim.Frames - 1 do
             begin
+              WLogStr('| | | FramePolyData #' + IntToStr(k));
+
               pPolyData := TLMFramePolyData.Create;
 
               m_pMemoryStream.Read(pPolyData.m_nVertices, 1);
@@ -591,21 +710,40 @@ begin
 
               end;
 
+              WLogInt('| | | Vertices', pPolyData.m_nVertices);
+
+              szDump := '';
+
+              for n := 0 to pPolyData.m_nVertices - 1 do
+              begin
+                szDump := szDump + ' [' + IntToStr(pPolyData.m_anData[n * 3 + 0]) +
+                       ' ' + IntToStr(pPolyData.m_anData[n * 3 + 1]) +
+                       ' ' + IntToStr(pPolyData.m_anData[n * 3 + 2]) + ']';
+              end;
+              WLogStr('| | | | PoliesData =' + szDump);
+
               pBatch.FramePolyDataList.Add(pPolyData);
+              WLogStr('| | | ----------------------------------');
             end;
           end;
 
         end;
 
         pAnim.BatchesList.Add(pBatch);
+        WLogStr('| | ----------------------------------');
+        end;
       end;
 
       WorldLMAnimList.pLMAnimList.Add(pAnim);
       slAnimList.Add(pAnim.Name);
-      pAnim.SaveBatchesOnDisk;
+      if bSave then
+        pAnim.SaveBatchesOnDisk;
+
+      WLogStr('| ----------------------------------');
     end;
   end;
 
+  WLogStr('----------------------------------');
   SetLength(anTempArray, 0);
   slAnimList.SaveToFile(CPData.DumpsDir + CPData.Sep + 'LightAnimList.txt');
   slAnimList.Free;
@@ -624,7 +762,6 @@ var nTempCardinal: Cardinal = 0;
     pPolyRef: TLMPolyRef;
     pPolyData: TLMFramePolyData;
     szAnimName: string;
-    nTemp: Integer = 0;
 begin
   SetLength(anTempArray, LIGHTMAP_MAX_DATA_SIZE);
 
@@ -648,10 +785,6 @@ begin
     nTempCardinal := Length(szAnimName);
 
     WriteLn('--- Writing LA: ', szAnimName);
-    nTemp := Logger.RootLevel;
-    Logger.RootLevel := LM_INFO;
-    WLogStr('--- Writing LA: ' + szAnimName);
-    Logger.RootLevel := nTemp;
 
     m_pMemoryStream.Write(nTempCardinal, 2);
     m_pMemoryStream.Write(szAnimName[1], nTempCardinal);
@@ -757,25 +890,35 @@ end;
 
 procedure TLTWorldReader.ReadWorld;
 begin
+  g_nGlobalLogIndex := LOG_HEADER;
   ReadHeader;
   ReadPropertiesAndExtents;
+  g_nGlobalLogIndex := LOG_WORLD_TREE;
   ReadWorldTree;
+  g_nGlobalLogIndex := LOG_WORLD_MODELS;
   ReadWorldModels;
   // test
   //m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
 
   m_pMemoryStream.Position := WorldHeader.dwObjectDataPos;
+  g_nGlobalLogIndex := LOG_OBJECTS;
   ReadObjects;
+  g_nGlobalLogIndex := LOG_RENDER_DATA;
   m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
   if g_szLightAnimsJob = 'save' then
   begin
-    ReadRenderData;
+    ReadRenderData(True);
+  end
+  else if g_szLightAnimsJob = 'read' then
+  begin
+    ReadRenderData(False);
   end
   else if g_szLightAnimsJob = 'load' then
   begin
     m_pMemoryStream.SetSize(WorldHeader.dwRenderDataPos + 16);
     WriteRenderData;
   end;
+  g_nGlobalLogIndex := LOG_GENERIC;
 end;
 
 procedure TLTWorldReader.RemoveWorldModel(szName: string);

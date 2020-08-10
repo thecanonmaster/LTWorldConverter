@@ -31,7 +31,7 @@ lib/
 *.app/
 
 # Project specific
-log.txt
+logs/
 dumps/
 tmp/
 *.bat

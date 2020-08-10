@@ -5,10 +5,10 @@ unit globals;
 interface
 
 uses
-  Classes, SysUtils, MyLogger, MyCrossPlatform, ltworldtypes;
+  Classes, SysUtils, MyLogger, MyCrossPlatform, ltworldtypes, sha1;
 
 const
-  LTWC_VERSION = 'v0.124 alpha';
+  LTWC_VERSION = 'v0.126 alpha';
 
 type
   TDynByteArray = array of Byte;
@@ -26,11 +26,14 @@ var
   //g_bIgnoreObjects: Boolean;
   g_szLightAnimsJob: string;
   g_bDebugProps: Boolean;
+  g_nGlobalLogIndex: Integer = LOG_GENERIC;
 
   g_bLMFramesToSeparateTGA: Boolean = False;
   g_bAdditionalTexturesLTA: Boolean = False;
   g_bLightMapTexturesLTA: Boolean = False;
 
+
+function DumpExceptionCallStack(E: Exception): string;
 procedure WLogReal(S: string; F: LTFloat);
 procedure WLogVec(S: string; V: PLTVector);
 procedure WLogStr(S: string);
@@ -45,37 +48,55 @@ procedure DynArray_MemSet32(Buffer: TDynCardinalArray; nPosition: Cardinal; nVal
 procedure SimpleBlt32(Dest: TDynCardinalArray; Source: TDynCardinalArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
 procedure SimpleReverseBlt32(Source: TDynCardinalArray; Dest: TDynCardinalArray; nSourceWidth: Word; nDestWidth: Word; nDestHeight: Word; nX: Word; nY: Word);
 function CompareDynArrays(anLeft: TDynByteArray; anRight: TDynByteArray; nLength: Cardinal): Integer;
+function DynArray_Sha1Hash(Source: TDynByteArray; nLength: Cardinal): string;
 
 implementation
 
+function DumpExceptionCallStack(E: Exception): string;
+var
+  I: Integer;
+  Frames: PPointer;
+begin
+  Result := 'Program exception! ' + LineEnding +
+    'Stacktrace:' + LineEnding + LineEnding;
+  if E <> nil then begin
+    Result := Result + 'Exception class: ' + E.ClassName + LineEnding +
+    'Message: ' + E.Message + LineEnding;
+  end;
+  Result := Result + BackTraceStrFunc(ExceptAddr);
+  Frames := ExceptFrames;
+  for I := 0 to ExceptFrameCount - 1 do
+    Result := Result + LineEnding + BackTraceStrFunc(Frames[I]);
+end;
+
 procedure WLogReal(S: string; F: LTFloat);
 begin
-  Logger.WLog(LM_INFO, '| ' + S + ' = ' + FormatFloat('0.000000', F));
+  Logger.WLog(g_nGlobalLogIndex, etInfo, '| ' + S + ' = ' + FormatFloat('0.000000', F));
 end;
 
 procedure WLogVec(S: string; V: PLTVector);
 begin
-  Logger.WLog(LM_INFO, '| ' + S + ' = ' + LTVectorToStrC(V));
+  Logger.WLog(g_nGlobalLogIndex, etInfo, '| ' + S + ' = ' + LTVectorToStrC(V));
 end;
 
 procedure WLogStr(S: string);
 begin
-  Logger.WLog(LM_INFO, S);
+  Logger.WLog(g_nGlobalLogIndex, etInfo, S);
 end;
 
 procedure WLogStrWarn(S: string);
 begin
-  Logger.WLog(LM_WARN, S);
+  Logger.WLog(g_nGlobalLogIndex, etWarning, S);
 end;
 
 procedure WLogInt(S: string; N: cardinal);
 begin
-  Logger.WLog(LM_INFO, '| ' + S + ' = ' + IntToStr(N));
+  Logger.WLog(g_nGlobalLogIndex, etInfo, '| ' + S + ' = ' + IntToStr(N));
 end;
 
 procedure WLogAddr(S: string; N: cardinal);
 begin
-  Logger.WLog(LM_INFO, '| ' + S + ' = $' + IntToHex(N, 8));
+  Logger.WLog(g_nGlobalLogIndex, etInfo, '| ' + S + ' = $' + IntToHex(N, 8));
 end;
 
 procedure SaveArrayToFile(Buffer: TDynByteArray; nSize: Cardinal; szFilename: string);
@@ -225,6 +246,14 @@ begin
   begin
     if anLeft[i] <> anRight[i] then Exit(i);
   end;
+end;
+
+function DynArray_Sha1Hash(Source: TDynByteArray; nLength: Cardinal): string;
+begin
+  if nLength > 0 then
+    Result := SHA1Print(SHA1Buffer(Source[0], nLength))
+  else
+    Result := 'None';
 end;
 
 procedure DynArray_MemSet32(Buffer: TDynCardinalArray; nPosition: Cardinal; nValue: Cardinal; nCount: Cardinal);

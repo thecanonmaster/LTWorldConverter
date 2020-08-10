@@ -115,7 +115,7 @@ type
   end;
 
   TWorldExtents = record
-    fUnknown: LTFloat;
+    fLMGridSize: LTFloat;
     vExtentsMin: LTVector;
     vExtentsMax: LTVector;
     vOffset: LTVector;

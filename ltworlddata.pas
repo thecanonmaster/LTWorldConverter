@@ -143,6 +143,32 @@ type
     destructor Destroy; override;
   end;
 
+  { TLTPBlockRecord }
+
+  TLTPBlockRecord = class(TObject)
+  public
+    m_nSize: Word;
+    m_nWord1: Word;
+    m_pContents: array of Byte;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  { TLTPBlockTable }
+
+  TLTPBlockTable = class(TObject)
+  public
+    m_nCardinal1: Cardinal;
+    m_nCardinal2: Cardinal;
+    m_nCardinal3: Cardinal;
+    m_nSize: Cardinal;
+    m_vVector1: LTVector;
+    m_vVector2: LTVector;
+    m_pRecords: TFPObjectList;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
   { TLTWorldBsp }
 
   TLTWorldBsp = class(TObject)
@@ -171,7 +197,10 @@ type
     m_pPlanes: TFPObjectList;
     m_pSurfaces: TFPObjectList;
     m_pPoints: TFPObjectList;
+    m_pLeafs: TFPObjectList;
     m_pNodes: TFPObjectList;
+    m_pUserPortals: TFPObjectList;
+    m_pPBlockTable: TLTPBlockTable;
 
   protected
   public
@@ -199,7 +228,10 @@ type
     property PlanesList: TFPObjectList read m_pPlanes write m_pPlanes;
     property SurfacesList: TFPObjectList read m_pSurfaces write m_pSurfaces;
     property PointsList: TFPObjectList read m_pPoints write m_pPoints;
+    property LeafsList: TFPObjectList read m_pLeafs write m_pLeafs;
     property NodesList: TFPObjectList read m_pNodes write m_pNodes;
+    property UserPortalList: TFPObjectList read m_pUserPortals write m_pUserPortals;
+    property PBlockTable: TLTPBlockTable read m_pPBlockTable write m_pPBlockTable;
 
     function Load(FS: TMemoryStream; bUsePlaneTypes: Boolean): Integer;
     procedure ReadTextures(FS: TMemoryStream);
@@ -309,10 +341,101 @@ type
     destructor Destroy; override;
   end;
 
+  { TLTUserPortal }
+
+  TLTUserPortal = class(TObject)
+  public
+    m_szName: string;
+    m_nCardinal1: Cardinal;
+    m_nCardinal2: Cardinal;
+    m_nWord1: Word;
+    m_vCenter: LTVector;
+    m_vDims: LTVector;
+  end;
+
+  { TLTLeafList }
+
+  TLTLeafList = class(TObject)
+  public
+    m_nPortalId: Word;
+    m_nSize: Word;
+    m_pContents: array of Byte;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  { TLTLeaf }
+
+  TLTLeaf = class(TObject)
+  public
+    m_nNumLeafLists: Word;
+    m_nLeafListIndex: Word;
+    m_pLeafLists: TFPObjectList;
+    m_nPoliesCount: Cardinal;
+    m_pPolies: array of Word;
+    m_nCardinal1: Cardinal;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
 function w_NodeForIndex(nListSize: Cardinal; nIndex: Integer; var nStatus: Cardinal): Cardinal;
 procedure w_SetPlaneTypes(pNodeList: TFPObjectList; pPolyList: TFPObjectList; pPlaneList: TFPObjectList; nNodes: Cardinal; bUsePlaneTypes: Boolean);
 
 implementation
+
+{ TLTLeaf }
+
+constructor TLTLeaf.Create;
+begin
+  m_nLeafListIndex := 0;
+  m_pLeafLists := TFPObjectList.Create(True);
+end;
+
+destructor TLTLeaf.Destroy;
+begin
+  m_pLeafLists.Free;
+  SetLength(m_pPolies, 0);
+  inherited Destroy;
+end;
+
+{ TLTLeafList }
+
+constructor TLTLeafList.Create;
+begin
+
+end;
+
+destructor TLTLeafList.Destroy;
+begin
+  SetLength(m_pContents, 0);
+  inherited Destroy;
+end;
+
+{ TLTPBlockTable }
+
+constructor TLTPBlockTable.Create;
+begin
+  m_pRecords := TFPObjectList.Create(True);
+end;
+
+destructor TLTPBlockTable.Destroy;
+begin
+  m_pRecords.Free;
+  inherited Destroy;
+end;
+
+{ TLTPBlockRecord }
+
+constructor TLTPBlockRecord.Create;
+begin
+
+end;
+
+destructor TLTPBlockRecord.Destroy;
+begin
+  SetLength(m_pContents, 0);
+  inherited Destroy;
+end;
 
 { TLMFramePolyData }
 
@@ -341,7 +464,7 @@ begin
     m_anDecData[i] := m_anDecData[i + 2];
     m_anDecData[i + 2] := nTemp;
     if m_anDecData[i + 3] <> 0 then
-      Logger.WLog(LM_WARN, 'LM alpha is not zero for some reason!');
+      WLogStrWarn('LM alpha is not zero for some reason!');
     Inc(i, 4)
   end;
 end;
@@ -724,7 +847,7 @@ end;
 function TLTWorldBsp.Load(FS: TMemoryStream; bUsePlaneTypes: Boolean): Integer;
 var dwWorldInfoFlags, dwUnknown, dwUnknown2, dwUnknown3: Cardinal;
     nNameLen: Word;
-    nTemp: Integer;
+    nTemp: TEventType;
     //pVertex: TLTWorldVertex;
 begin
   Result := 0;
@@ -743,7 +866,7 @@ begin
 
   WriteLn('--- Loading BSP: ', m_szWorldName);
   nTemp := Logger.RootLevel;
-  Logger.RootLevel := LM_INFO;
+  Logger.RootLevel := etInfo;
   WLogStr('--- Loading BSP: ' + m_szWorldName);
   Logger.RootLevel := nTemp;
 
@@ -790,7 +913,7 @@ begin
 
   FS.Read(m_nSections, 4);
   if m_nSections > 0 then
-    Logger.WLog(LM_WARN, 'WorldModel has terrain sections > 0');
+    WLogStrWarn('WorldModel has terrain sections > 0');
 
   w_SetPlaneTypes(m_pNodes, m_pPolies, m_pPlanes, m_nNodes, bUsePlaneTypes);
 
@@ -815,7 +938,7 @@ begin
       FS.Read(nPoly, 4);
       if nPoly >= m_nPolies then
       begin
-        Logger.WLog(LM_WARN, Format('Node %d has invalid poly index (%d)', [i, nPoly]));
+        WLogStrWarn(Format('Node %d has invalid poly index (%d)', [i, nPoly]));
       end;
       pNode.Poly := nPoly;
       pNode.Flags := 0;
@@ -864,7 +987,7 @@ begin
       FS.Read(nPoly, 4);
       if nPoly >= m_nPolies then
       begin
-        Logger.WLog(LM_ERROR, Format('Node %d has invalid poly index (%d)', [i, nPoly]));
+        WLogStrWarn(Format('Node %d has invalid poly index (%d)', [i, nPoly]));
         Exit;
       end;
       pNode.Poly := nPoly;
@@ -904,60 +1027,57 @@ end;
 procedure TLTWorldBsp.ReadUserPortals(FS: TMemoryStream);
 var i: Cardinal;
     nNameLen: Word = 0;
-    szName: string;
-    nTempCardinal: Cardinal = 0;
-    nTempWord: Word = 0;
-    vTempVector: LTVector;
+    pUserPortal: TLTUserPortal;
 begin
   if m_nUserPortals > 0 then
   begin
     for i := 0 to m_nUserPortals - 1 do
     begin
+      pUserPortal := TLTUserPortal.Create;
+
       FS.Read(nNameLen, 2);
-      SetLength(szName, nNameLen);
-      FS.Read(szName[1], nNameLen);
-      FS.Read(nTempCardinal, 4);
-      FS.Read(nTempCardinal, 4);
-      FS.Read(nTempWord, 2);
-      FS.Read(vTempVector{%H-}, SizeOf(LTVector));
-      FS.Read(vTempVector, SizeOf(LTVector));
+      SetLength(pUserPortal.m_szName, nNameLen);
+      FS.Read(pUserPortal.m_szName[1], nNameLen);
+      FS.Read(pUserPortal.m_nCardinal1, 4);
+      FS.Read(pUserPortal.m_nCardinal2, 4);
+      FS.Read(pUserPortal.m_nWord1, 2);
+      FS.Read(pUserPortal.m_vCenter, SizeOf(LTVector));
+      FS.Read(pUserPortal.m_vDims, SizeOf(LTVector));
+
+      m_pUserPortals.Add(pUserPortal);
     end;
   end;
 end;
 
 procedure TLTWorldBsp.ReadPBlockTable(FS: TMemoryStream);
-var nTempCardinal1, nTempCardinal2, nTempCardinal3, i: Cardinal;
-    nCounterCardinal: Cardinal = 0;
-    vTempVector: LTVector;
-    nCounterWord: Word = 0;
-    nTempWord: Word = 0;
-    anTempBuffer: array of Byte;
+var i: Cardinal;
+    pRecord: TLTPBlockRecord;
 begin
-  nTempCardinal1 := 0;
-  nTempCardinal2 := 0;
-  nTempCardinal3 := 0;
-  FS.Read(nTempCardinal1, 4);
-  FS.Read(nTempCardinal2, 4);
-  FS.Read(nTempCardinal3, 4);
 
-  nCounterCardinal := nTempCardinal1 * nTempCardinal2 * nTempCardinal3;
+  FS.Read(m_pPBlockTable.m_nCardinal1, 4);
+  FS.Read(m_pPBlockTable.m_nCardinal2, 4);
+  FS.Read(m_pPBlockTable.m_nCardinal3, 4);
 
-  FS.Read(vTempVector{%H-}, SizeOf(LTVector));
-  FS.Read(vTempVector, SizeOf(LTVector));
+  m_pPBlockTable.m_nSize := m_pPBlockTable.m_nCardinal1 * m_pPBlockTable.m_nCardinal2 * m_pPBlockTable.m_nCardinal3;
 
-  if nCounterCardinal > 0 then
+  FS.Read(m_pPBlockTable.m_vVector1{%H-}, SizeOf(LTVector));
+  FS.Read(m_pPBlockTable.m_vVector2, SizeOf(LTVector));
+
+  if m_pPBlockTable.m_nSize > 0 then
   begin
-    for i := 0 to nCounterCardinal - 1 do
+    for i := 0 to m_pPBlockTable.m_nSize - 1 do
     begin
-      FS.Read(nCounterWord, 2);
-      FS.Read(nTempWord, 2);
+      pRecord := TLTPBlockRecord.Create;
+      FS.Read(pRecord.m_nSize, 2);
+      FS.Read(pRecord.m_nWord1, 2);
 
-      if nCounterWord > 0 then
+      if pRecord.m_nSize > 0 then
       begin
-        SetLength(anTempBuffer, 6 * nCounterWord);
-        FS.Read(anTempBuffer[0], 6 * nCounterWord);
-        SetLength(anTempBuffer, 0);
+        SetLength(pRecord.m_pContents, 6 * pRecord.m_nSize);
+        FS.Read(pRecord.m_pContents[0], 6 * pRecord.m_nSize);
       end;
+
+      m_pPBlockTable.m_pRecords.Add(pRecord);
     end;
   end;
 
@@ -1133,7 +1253,7 @@ begin
     end
     else
     begin
-      Logger.WLog(LM_WARN, 'Texture #' + IntToStr(i) + ' has zero length!');
+      WLogStrWarn('Texture #' + IntToStr(i) + ' has zero length!');
     end;
     FS.Position := FS.Position + 1;
   end;
@@ -1168,45 +1288,46 @@ end;
 
 procedure TLTWorldBsp.ReadLeafs(FS: TMemoryStream);
 var i, j: Cardinal;
-    nNumLeafLists: Word = 0;
-    nTempWord: Word = 0;
-    anTempArray: array of Byte;
-    nPoliesCount: Cardinal = 0;
-    nUnknownCardinal: Cardinal = 0;
+    pLeaf: TLTLeaf;
+    pLeafList: TLTLeafList;
 begin
   if m_nLeafs > 0 then
   begin
     for i := 0 to m_nLeafs - 1 do
     begin
-      FS.Read(nNumLeafLists, 2);
-      if nNumLeafLists = $FFFF then
+      pLeaf := TLTLeaf.Create;
+
+      FS.Read(pLeaf.m_nNumLeafLists, 2);
+      if pLeaf.m_nNumLeafLists = $FFFF then
       begin
-        FS.Read(nTempWord, 2);
+        FS.Read(pLeaf.m_nLeafListIndex, 2);
       end
       else
       begin
-        if nNumLeafLists > 0 then
+        if pLeaf.m_nNumLeafLists > 0 then
         begin
-          for j := 0 to nNumLeafLists - 1 do
+          for j := 0 to pLeaf.m_nNumLeafLists - 1 do
           begin
-            FS.Read(nTempWord, 2);
-            FS.Read(nTempWord, 2);
-            SetLength(anTempArray, nTempWord);
-            FS.Read(anTempArray[0], nTempWord);
-            SetLength(anTempArray, 0);
+            pLeafList := TLTLeafList.Create;
+
+            FS.Read(pLeafList.m_nPortalId, 2);
+            FS.Read(pLeafList.m_nSize, 2);
+            SetLength(pLeafList.m_pContents, pLeafList.m_nSize);
+            FS.Read(pLeafList.m_pContents[0], pLeafList.m_nSize);
+
+            pLeaf.m_pLeafLists.Add(pLeafList);
           end;
         end;
       end;
-      FS.Read(nPoliesCount, 4);
-      if nPoliesCount > 0 then
+      FS.Read(pLeaf.m_nPoliesCount, 4);
+      if pLeaf.m_nPoliesCount > 0 then
       begin
-        for j := 0 to nPoliesCount - 1 do
-        begin
-          FS.Read(nTempWord, 2);
-          FS.Read(nTempWord, 2);
-        end;
+        SetLength(pLeaf.m_pPolies, pLeaf.m_nPoliesCount * 4);
+        FS.Read(pLeaf.m_pPolies[0], pLeaf.m_nPoliesCount * 4);
       end;
-      FS.Read(nUnknownCardinal, 4);
+      FS.Read(pLeaf.m_nCardinal1, 4);
+
+      m_pLeafs.Add(pLeaf);
     end;
   end;
 end;
@@ -1217,7 +1338,10 @@ begin
   m_pPlanes := TFPObjectList.Create(True);
   m_pSurfaces := TFPObjectList.Create(True);
   m_pPoints := TFPObjectList.Create(True);
+  m_pLeafs := TFPObjectList.Create(True);
   m_pNodes := TFPObjectList.Create(True);
+  m_pUserPortals := TFPObjectList.Create(True);
+  m_pPBlockTable := TLTPBlockTable.Create;
 end;
 
 destructor TLTWorldBsp.Destroy;
@@ -1233,7 +1357,10 @@ begin
   m_pPlanes.Free;
   m_pSurfaces.Free;
   m_pPoints.Free;
+  m_pLeafs.Free;
   m_pNodes.Free;
+  m_pUserPortals.Free;
+  m_pPBlockTable.Free;
 end;
 
 constructor TLTWorldPoly.Create;

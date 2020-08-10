@@ -5,7 +5,15 @@ unit MyLogger;
 interface
 
 uses
-  Classes, SysUtils, eventlog;
+  Classes, SysUtils;
+
+const
+  LOG_GENERIC = 0;
+  LOG_HEADER = 1;
+  LOG_WORLD_TREE = 2;
+  LOG_WORLD_MODELS = 3;
+  LOG_OBJECTS = 4;
+  LOG_RENDER_DATA = 5;
 
 type
 
@@ -14,104 +22,100 @@ type
   TMyLameLogger = class(TObject)
   private
   protected
-    m_nRootLevel: Integer;
-    m_pLogger2: TEventLog;
+    m_eRootLevel: TEventType;
+    m_pLoggers: array of TStringList;
+    m_pFullnames: array of string;
   public
-    property RootLevel: Integer read m_nRootLevel write m_nRootLevel;
-    function CheckRootLevel(Mode: Integer): Boolean;
-    procedure WLog(Mode: integer; Msg: string);
-    procedure WLogStrings(Mode: integer; szIdentifier: string; slList: TStringList);
-    procedure WLogStringsEx(Mode: integer; szIdentifier: string; aslArgs: array of TStringList);
-    constructor Create(szFileName: string); virtual;
+    property RootLevel: TEventType read m_eRootLevel write m_eRootLevel;
+    function CheckRootLevel(Mode: TEventType): Boolean;
+    procedure WLog(Index: Integer; Mode: TEventType; Msg: string);
+    procedure WLogStrings(Index: Integer; Mode: TEventType; szIdentifier: string;
+      slList: TStringList);
+    procedure WLogStringsEx(Index: Integer; Mode: TEventType; szIdentifier: string;
+      aslArgs: array of TStringList);
+    procedure Flush;
+    constructor Create(szFilename: string; slLoggerNames: TStringList); virtual;
     destructor Destroy; override;
   end;
 
 const
-  LM_INFO = 0;
-  LM_WARN = 1;
-  LM_ERROR = 2;
-  LM_DEBUG = 3;
   STRSEP = '------------------------------------------------------------------------------------';
 
 implementation
 
-constructor TMyLameLogger.Create(szFileName: string);
+constructor TMyLameLogger.Create(szFilename: string; slLoggerNames: TStringList);
+var pLogger: TStringList;
+    i: Integer;
 begin
-  m_pLogger2 := TEventLog.Create(nil);
-  m_pLogger2.FileName := szFileName;
-  m_pLogger2.LogType := ltFile;
-  m_pLogger2.TimeStampFormat := 'hh:nn:ss.zzz';
-  m_nRootLevel := LM_INFO;
-  DeleteFile(szFileName);
-  WLog(LM_INFO, 'Program started...');
+  SetLength(m_pLoggers, slLoggerNames.Count);
+  SetLength(m_pFullnames, slLoggerNames.Count);
+  for i := 0 to slLoggerNames.Count - 1 do
+  begin
+    {pLogger := TEventLog.Create(nil);
+    pLogger.FileName := szFilename + '_' + slLoggerNames.Strings[i] + '.txt';
+    pLogger.LogType := ltFile;
+    pLogger.TimeStampFormat := 'hh:nn:ss.zzz'; }
+
+    pLogger := TStringList.Create;
+    m_pFullnames[i] := szFilename + '_' + slLoggerNames.Strings[i] + '.txt';
+    m_pLoggers[i] := pLogger;
+    DeleteFile(m_pFullnames[i]);
+  end;
+
+  m_eRootLevel := etInfo;
+  WLog(LOG_GENERIC, etInfo, 'Program started...');
 end;
 
 destructor TMyLameLogger.Destroy;
+var i: Integer;
 begin
-  m_nRootLevel := LM_INFO;
-  WLog(LM_INFO, 'Program stopped...');
+  m_eRootLevel := etInfo;
+  WLog(LOG_GENERIC, etInfo, 'Program stopped...');
+  Flush;
+  for i := 0 to Length(m_pLoggers) - 1 do
+    m_pLoggers[i].Free;
+  SetLength(m_pLoggers, 0);
+  SetLength(m_pFullnames, 0);
   inherited;
 end;
 
-function TMyLameLogger.CheckRootLevel(Mode: Integer): Boolean;
+function TMyLameLogger.CheckRootLevel(Mode: TEventType): Boolean;
 begin
-  if m_nRootLevel <= Mode then Result := True else Result := False;
+  Result := (m_eRootLevel <= Mode);
 end;
 
-procedure TMyLameLogger.WLog(Mode: integer; Msg: string);
+procedure TMyLameLogger.WLog(Index: Integer; Mode: TEventType; Msg: string);
 begin
   if not CheckRootLevel(Mode) then Exit;
 
-  case Mode of
-    LM_INFO: m_pLogger2.Info(Msg);
-    LM_WARN:
-      begin
-        m_pLogger2.Warning(Msg);
-        WriteLn('[WARNING] ', Msg);
-      end;
-    LM_ERROR:
-      begin
-        m_pLogger2.Error(Msg);
-        WriteLn('[ERROR] ', Msg);
-      end;
-    LM_DEBUG: m_pLogger2.Debug(Msg);
-  end;
+  m_pLoggers[Index].Add(Msg);
+
+  if Mode = etWarning then
+    WriteLn('[WARNING] ', Msg)
+  else if Mode = etError then
+    WriteLn('[ERROR] ', Msg);
 end;
 
-procedure TMyLameLogger.WLogStrings(Mode: integer; szIdentifier: string;
+procedure TMyLameLogger.WLogStrings(Index: Integer; Mode: TEventType; szIdentifier: string;
   slList: TStringList);
 var
-  i: integer;
-  Level: TEventType;
+  i: Integer;
 begin
   if not CheckRootLevel(Mode) then Exit;
 
-  case Mode of
-    LM_INFO: Level := etInfo;
-    LM_WARN: Level := etWarning;
-    LM_ERROR: Level := etError;
-    LM_DEBUG: Level := etDebug;
-  end;
   for i := 0 to slList.Count - 1 do
   begin
-    m_pLogger2.Log(Level, szIdentifier + ' | ' + slList[i]);
+    m_pLoggers[Index].Add(szIdentifier + ' | ' + slList[i]);
   end;
 end;
 
-procedure TMyLameLogger.WLogStringsEx(Mode: integer; szIdentifier: string; aslArgs: array of TStringList);
+procedure TMyLameLogger.WLogStringsEx(Index: Integer; Mode: TEventType; szIdentifier: string; aslArgs: array of TStringList);
 var
-  i, j: integer;
-  Level: TEventType;
+  i, j: Integer;
   szBufferStr: string;
 begin
   if not CheckRootLevel(Mode) then Exit;
 
-  case Mode of
-    LM_INFO: Level := etInfo;
-    LM_WARN: Level := etWarning;
-    LM_ERROR: Level := etError;
-    LM_DEBUG: Level := etDebug;
-  end;
   for i := 0 to aslArgs[0].Count - 1 do
   begin
     szBufferStr := '';
@@ -120,7 +124,16 @@ begin
     begin
       szBufferStr := szBufferStr + ' / ' + aslArgs[j].Strings[i];
     end;
-    m_pLogger2.Log(Level, szIdentifier + ' | ' + szBufferStr);
+    m_pLoggers[Index].Add(szIdentifier + ' | ' + szBufferStr);
+  end;
+end;
+
+procedure TMyLameLogger.Flush;
+var i: Integer;
+begin
+  for i := 0 to Length(m_pLoggers) - 1 do
+  begin
+    m_pLoggers[i].SaveToFile(m_pFullnames[i]);
   end;
 end;
 
