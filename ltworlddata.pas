@@ -25,7 +25,11 @@ type
     m_fUV1: LTVector;
     m_fUV2: LTVector;
     m_fUV3: LTVector;
+    m_vUnknown1: LTVector;
+    m_vUnknown2: LTVector;
+    m_vUnknown3: LTVector;
     m_nTexture: Word;
+    m_nUnknown0: Cardinal;
     m_nFlags: Cardinal;
     m_nUnknown1: Byte;
     m_nUnknown2: Byte;
@@ -66,16 +70,26 @@ type
   private
     m_nFlags: Byte;
     m_nPlaneType: Byte;
+    m_nUnknown1: Cardinal;
     m_nPoly: Cardinal;
     m_nLeaf: Word;
+    m_fUnknown1: LTFloat;
+    m_fUnknown2: LTFloat;
+    m_fUnknown3: LTFloat;
+    m_fUnknown4: LTFloat;
   public
     m_anSides: TLTNodeIndices;
     m_anSidesStatus: TLTNodeIndices;
 
-    property Flags: Byte read m_nFlags write m_nFlags;
+    //property Flags: Byte read m_nFlags write m_nFlags;
     property PlaneType: Byte read m_nPlaneType write m_nPlaneType;
     property Leaf: Word read m_nLeaf write m_nLeaf;
     property Poly: Cardinal read m_nPoly write m_nPoly;
+    property UnknownCardinal1: Cardinal read m_nUnknown1 write m_nUnknown1;
+    property UnknownFloat1: LTFloat read m_fUnknown1 write m_fUnknown1;
+    property UnknownFloat2: LTFloat read m_fUnknown2 write m_fUnknown2;
+    property UnknownFloat3: LTFloat read m_fUnknown3 write m_fUnknown3;
+    property UnknownFloat4: LTFloat read m_fUnknown4 write m_fUnknown4;
     property Sides: TLTNodeIndices read m_anSides write m_anSides;
     property SidesStatus: TLTNodeIndices read m_anSidesStatus write m_anSidesStatus;
   end;
@@ -89,19 +103,21 @@ type
     m_nLoVerts: Byte;
     m_nHiVerts: Byte;
 
-    m_vCenter: LTVector;
-    m_fRadius: LTFloat;
+    //m_vCenter: LTVector;
+    //m_fRadius: LTFloat;
 
     m_nLightmapWidth: Word;
     m_nLightmapHeight: Word;
 
-    m_nUnknownNum: Word;
-    m_anUnknownList: TDynWordArray;
+    //m_nUnknownNum: Word;
+    //m_anUnknownList: TDynWordArray;
 
     m_vUV1: LTVector;
     m_vUV2: LTVector;
     m_vUV3: LTVector;
 
+    m_nUnknown1: Cardinal;
+    m_nUnknown2: Cardinal;
     m_nPlane: Cardinal;
     m_nSurface: Cardinal;
 
@@ -112,12 +128,12 @@ type
 
     procedure FillRelVerts;
   public
-    property Radius: LTFloat read m_fRadius write m_fRadius;
-    property Center: LTVector read m_vCenter write m_vCenter;
+    //property Radius: LTFloat read m_fRadius write m_fRadius;
+    //property Center: LTVector read m_vCenter write m_vCenter;
     property LightmapWidth: Word read m_nLightmapWidth write m_nLightmapWidth;
     property LightmapHeight: Word read m_nLightmapHeight write m_nLightmapHeight;
-    property UnknownNum: Word read m_nUnknownNum write m_nUnknownNum;
-    property UnknownList: TDynWordArray read m_anUnknownList write m_anUnknownList;
+    //property UnknownNum: Word read m_nUnknownNum write m_nUnknownNum;
+    //property UnknownList: TDynWordArray read m_anUnknownList write m_anUnknownList;
 
     property LoVerts: Byte read m_nLoVerts write m_nLoVerts;
     property HiVerts: Byte read m_nHiVerts write m_nHiVerts;
@@ -131,6 +147,10 @@ type
     property LMFrameIndex: Cardinal read m_nLMFrameIndex write m_nLMFrameIndex;
 
     property IndexAndNumVerts: Cardinal read m_nIndexAndNumVerts write m_nIndexAndNumVerts;
+
+    property UnknownCardinal1: Cardinal read m_nUnknown1 write m_nUnknown1;
+    property UnknownCardinal2: Cardinal read m_nUnknown2 write m_nUnknown2;
+
     property Plane: Cardinal read m_nPlane write m_nPlane;
     property Surface: Cardinal read m_nSurface write m_nSurface;
     function GetNumVertices: Cardinal;
@@ -347,7 +367,7 @@ type
   public
     m_szName: string;
     m_nCardinal1: Cardinal;
-    m_nCardinal2: Cardinal;
+    //m_nCardinal2: Cardinal;
     m_nWord1: Word;
     m_vCenter: LTVector;
     m_vDims: LTVector;
@@ -371,9 +391,9 @@ type
     m_nNumLeafLists: Word;
     m_nLeafListIndex: Word;
     m_pLeafLists: TFPObjectList;
-    m_nPoliesCount: Cardinal;
+    m_nPoliesCount: Word;
     m_pPolies: array of Word;
-    m_nCardinal1: Cardinal;
+    m_fFloat1: LTFloat;
     constructor Create; virtual;
     destructor Destroy; override;
   end;
@@ -779,26 +799,28 @@ end;
 procedure TLTWorldPoly.ReadPoly(FS: TMemoryStream);
 //var i: Cardinal;
 begin
-  FS.Read(m_vCenter, SizeOf(LTVector));
+  //FS.Read(m_vCenter, SizeOf(LTVector));
   //FS.Read(m_fRadius, 4);
 
   FS.Read(m_nLightmapWidth, 2);
   FS.Read(m_nLightmapHeight, 2);
 
-  FS.Read(m_nUnknownNum, 2);
+  {FS.Read(m_nUnknownNum, 2);
 
   if m_nUnknownNum > 0 then
   begin
     SetLength(m_anUnknownList, m_nUnknownNum * 2);
     FS.Read(m_anUnknownList[0], SizeOf(Word) * m_nUnknownNum * 2);
-  end;
+  end;  }
 
+  FS.Read(m_nUnknown1, 4);
+  FS.Read(m_nUnknown2, 4);
   FS.Read(m_nSurface, 4);
-  FS.Read(m_nPlane, 4);
+  //FS.Read(m_nPlane, 4);
 
-  FS.Read(m_vUV1, sizeof(LTVector));
-  FS.Read(m_vUV2, sizeof(LTVector));
-  FS.Read(m_vUV3, sizeof(LTVector));
+  //FS.Read(m_vUV1, sizeof(LTVector));
+  //FS.Read(m_vUV2, sizeof(LTVector));
+  //FS.Read(m_vUV3, sizeof(LTVector));
 
   FS.Read(m_aDiskVerts[0], SizeOf(TLTDiskVert) * GetNumVertices);
   FillRelVerts;
@@ -845,24 +867,29 @@ begin
 end;
 
 function TLTWorldBsp.Load(FS: TMemoryStream; bUsePlaneTypes: Boolean): Integer;
-var dwWorldInfoFlags, dwUnknown, dwUnknown2, dwUnknown3: Cardinal;
+var dwWorldInfoFlags,
+  dwUnknown1, dwUnknown2, dwUnknown3, dwUnknown4, dwUnknown5: Cardinal;
     nNameLen: Word;
     nTemp: TEventType;
     //pVertex: TLTWorldVertex;
+    i: Cardinal;
 begin
   Result := 0;
   dwWorldInfoFlags := 0;
-  dwUnknown := 0;
+  dwUnknown1 := 0;
   dwUnknown2 := 0;
   dwUnknown3 := 0;
+  dwUnknown4 := 0;
+  dwUnknown5 := 0;
   nNameLen := 0;
   FS.Read(dwWorldInfoFlags, 4);
   //Assert((dwWorldInfoFlags and $ffff0000) = 0, 'ASSERT FAILED!');
   m_nWorldInfoFlags := dwWorldInfoFlags;
-  FS.Read(dwUnknown, 4);
+  //FS.Read(dwUnknown, 4);
   FS.Read(nNameLen, 2);
   SetLength(m_szWorldName, nNameLen);
-  FS.Read(m_szWorldName[1], nNameLen);
+  if nNameLen > 0 then
+    FS.Read(m_szWorldName[1], nNameLen);
 
   WriteLn('--- Loading BSP: ', m_szWorldName);
   nTemp := Logger.RootLevel;
@@ -870,7 +897,7 @@ begin
   WLogStr('--- Loading BSP: ' + m_szWorldName);
   Logger.RootLevel := nTemp;
 
-  FS.Read(m_nPoints, 4);
+  {FS.Read(m_nPoints, 4);
   FS.Read(m_nPlanes, 4);
   FS.Read(m_nSurfaces, 4);
 
@@ -883,7 +910,20 @@ begin
   FS.Read(m_nNodes, 4);
 
   FS.Read(dwUnknown2, 4);
+  FS.Read(dwUnknown3, 4);  }
+
+  FS.Read(dwUnknown1, 4);
+  FS.Read(m_nPoints, 4);
+  FS.Read(m_nPlanes, 4);
+  FS.Read(m_nSurfaces, 4);
+  FS.Read(m_nUserPortals, 4);
+  FS.Read(m_nPolies, 4);
+  FS.Read(m_nLeafs, 4);
+  FS.Read(dwUnknown2, 4);
   FS.Read(dwUnknown3, 4);
+  FS.Read(dwUnknown4, 4);
+  FS.Read(m_nNodes, 4);
+  FS.Read(dwUnknown5, 4);
 
   FS.Read(m_vMinBox, SizeOf(LTVector));
   FS.Read(m_vMaxBox, SizeOf(LTVector));
@@ -893,8 +933,12 @@ begin
   FS.Read(m_nTextures, 4);
 
   ReadTextures(FS);
+  //m_nPolies := 6;
   ReadPolies(FS, False);
+
+  //m_nLeafs := 1;
   ReadLeafs(FS);
+
   // fuck this!
   {if m_nLeafs > 0 then
   begin
@@ -902,20 +946,31 @@ begin
     Exit(-1);
   end;  }
 
+  //m_nPlanes := 6;
   ReadPlanes(FS);
+
+  //m_nSurfaces := 6;
   ReadSurfaces(FS);
-  ReadPoints(FS);
+
   ReadPolies(FS, True);
+
+  //m_nNodes := 6;
   ReadNodes(FS);
+
+  //m_nUserPortals := 0;
   ReadUserPortals(FS);
+
+  //m_nPoints := 8;
+  ReadPoints(FS);
+
   ReadPBlockTable(FS);
   ReadRootNode(FS);
 
-  FS.Read(m_nSections, 4);
+  {FS.Read(m_nSections, 4);
   if m_nSections > 0 then
-    WLogStrWarn('WorldModel has terrain sections > 0');
+    WLogStrWarn('WorldModel has terrain sections > 0');  }
 
-  w_SetPlaneTypes(m_pNodes, m_pPolies, m_pPlanes, m_nNodes, bUsePlaneTypes);
+  //w_SetPlaneTypes(m_pNodes, m_pPolies, m_pPlanes, m_nNodes, bUsePlaneTypes);
 
   //Logger.WLog(LM_WARN, 'WorldData Ends: ' + IntToHex(FS.Position, 8));
 
@@ -941,7 +996,7 @@ begin
         WLogStrWarn(Format('Node %d has invalid poly index (%d)', [i, nPoly]));
       end;
       pNode.Poly := nPoly;
-      pNode.Flags := 0;
+      //pNode.Flags := 0;
       pNode.PlaneType := 0;
 
       FS.Read(nLeaf, 2);
@@ -969,7 +1024,8 @@ begin
 end;
 
 procedure TLTWorldBsp.ReadNodes(FS: TMemoryStream);
-var i, j, nPoly, nStatus: Cardinal;
+var i, j, nPoly, nUnknown1, nStatus: Cardinal;
+    afUnknown: array[0..3] of LTFloat;
     pNode: TLTWorldNode;
     nLeaf: Word;
     nNodeIndex: Integer;
@@ -984,12 +1040,15 @@ begin
     for i := 0 to m_nNodes - 1 do
     begin
       pNode := TLTWorldNode.Create;
+      FS.Read(nUnknown1, 4);
       FS.Read(nPoly, 4);
-      if nPoly >= m_nPolies then
+
+      {if nPoly >= m_nPolies then
       begin
         WLogStrWarn(Format('Node %d has invalid poly index (%d)', [i, nPoly]));
         Exit;
-      end;
+      end; }
+      pNode.UnknownCardinal1 := nUnknown1;
       pNode.Poly := nPoly;
 
       FS.Read(nLeaf, 2);
@@ -1001,6 +1060,12 @@ begin
         pNode.m_anSides[j] := w_NodeForIndex(m_nNodes, nNodeIndex, nStatus);
         pNode.m_anSidesStatus[j] := nStatus;
       end;
+
+      FS.Read(afUnknown[0], SizeOf(LTFloat) * 4);
+      pNode.m_fUnknown1 := afUnknown[0];
+      pNode.m_fUnknown2 := afUnknown[1];
+      pNode.m_fUnknown3 := afUnknown[2];
+      pNode.m_fUnknown4 := afUnknown[3];
 
       m_pNodes.Add(pNode);
     end;
@@ -1038,8 +1103,9 @@ begin
       FS.Read(nNameLen, 2);
       SetLength(pUserPortal.m_szName, nNameLen);
       FS.Read(pUserPortal.m_szName[1], nNameLen);
+
       FS.Read(pUserPortal.m_nCardinal1, 4);
-      FS.Read(pUserPortal.m_nCardinal2, 4);
+      //FS.Read(pUserPortal.m_nCardinal2, 4);
       FS.Read(pUserPortal.m_nWord1, 2);
       FS.Read(pUserPortal.m_vCenter, SizeOf(LTVector));
       FS.Read(pUserPortal.m_vDims, SizeOf(LTVector));
@@ -1156,7 +1222,11 @@ begin
     FS.Read(pSurface.m_fUV1, sizeof(LTVector));
     FS.Read(pSurface.m_fUV2, sizeof(LTVector));
     FS.Read(pSurface.m_fUV3, sizeof(LTVector));
+    FS.Read(pSurface.m_vUnknown1, sizeof(LTVector));
+    FS.Read(pSurface.m_vUnknown2, sizeof(LTVector));
+    FS.Read(pSurface.m_vUnknown3, sizeof(LTVector));
     FS.Read(pSurface.m_nTexture, 2);
+    FS.Read(pSurface.m_nUnknown0, 4);
     FS.Read(pSurface.m_nFlags, 4);
     FS.Read(pSurface.m_nUnknown1, 1);
     FS.Read(pSurface.m_nUnknown2, 1);
@@ -1319,13 +1389,14 @@ begin
           end;
         end;
       end;
-      FS.Read(pLeaf.m_nPoliesCount, 4);
+      //FS.Read(pLeaf.m_nPoliesCount, 4);
+      FS.Read(pLeaf.m_nPoliesCount, 2);
       if pLeaf.m_nPoliesCount > 0 then
       begin
         SetLength(pLeaf.m_pPolies, pLeaf.m_nPoliesCount * 4);
         FS.Read(pLeaf.m_pPolies[0], pLeaf.m_nPoliesCount * 4);
       end;
-      FS.Read(pLeaf.m_nCardinal1, 4);
+      FS.Read(pLeaf.m_fFloat1, 4);
 
       m_pLeafs.Add(pLeaf);
     end;
@@ -1371,7 +1442,7 @@ end;
 destructor TLTWorldPoly.Destroy;
 begin
   inherited;
-  SetLength(m_anUnknownList, 0);
+  //SetLength(m_anUnknownList, 0);
 end;
 
 function w_NodeForIndex(nListSize: Cardinal; nIndex: Integer; var nStatus: Cardinal): Cardinal;

@@ -56,11 +56,11 @@ begin
 
   if Filename = '' then
   begin
-    WriteLn('LithTech Talon World Converter ', LTWC_VERSION);
+    WriteLn('LithTech Shogo World Converter ', LTWC_VERSION);
     WriteLn('Options:');
     WriteLn('Using: LTWorldConv.exe -f InputFile.dat -e OutputFile.lta -g poly');
     WriteLn('Options:');
-    WriteLn('   -f: Input DAT world file. Version 70 is supported (AVP 2).');
+    WriteLn('   -f: Input DAT world file. Version 56 is supported (Shogo).');
     WriteLn('   -e: Output LTA world file. Can be imported into AVP2 DEdit.');
     //WriteLn('   -b: Brush type (avp2 or nolf2). For AVP2 or NOLF2.');
     WriteLn('   -g: Brush generation type (simple or poly). For each worldmodel or for each poly.');

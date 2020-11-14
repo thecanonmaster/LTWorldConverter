@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, contnrs;
 
 const
-  BSP_PHYSICS = 'PhysicsBSP';
+  BSP_PHYSICS = ''; //'PhysicsBSP';
   BSP_VIS = 'VisBSP';
 
   PT_STRING = 0;
@@ -102,6 +102,7 @@ type
   TWorldHeader = record
     nVersion: Cardinal;
     dwObjectDataPos: Cardinal;
+    dwBspDataPos: Cardinal;
     dwRenderDataPos: Cardinal;
     // addtional
     dwDummy1: Cardinal;
@@ -140,6 +141,11 @@ type
     pLMAnimList: TFPObjectList;
   end;
 
+  TWorldExtentsSH = record
+    vBoxMin: LTVector;
+    vBoxMax: LTVector;
+  end;
+
 function LTVectorToStrC(V: PLTVector): string;
 function LTRotationIgnoreWToStrC(R: PLTRotation): string;
 function LTRotationToStrC(R: PLTRotation): string;
@@ -174,32 +180,41 @@ begin
   Result.w := w;
 end;
 
+function FormatFloatSafe(Const Format : String; Value : Extended) : String;
+begin
+  try
+    Result := FormatFloat(Format, Value);
+  except
+    on E: Exception do Result := FloatToStr(Value);
+  end;
+end;
+
 function LTVectorToStrC(V: PLTVector): string;
 begin
-  Result := FormatFloat('0.000000', V^.x) + ' ' +
-           FormatFloat('0.000000', V^.y) + ' ' +
-           FormatFloat('0.000000', V^.z);
+  Result := FormatFloatSafe('0.000000', V^.x) + ' ' +
+           FormatFloatSafe('0.000000', V^.y) + ' ' +
+           FormatFloatSafe('0.000000', V^.z);
 end;
 
 function LTRotationIgnoreWToStrC(R: PLTRotation): string;
 begin
-  Result := FormatFloat('0.000000', R^.x) + ' ' +
-           FormatFloat('0.000000', R^.y) + ' ' +
-           FormatFloat('0.000000', R^.z);
+  Result := FormatFloatSafe('0.000000', R^.x) + ' ' +
+           FormatFloatSafe('0.000000', R^.y) + ' ' +
+           FormatFloatSafe('0.000000', R^.z);
 end;
 
 function LTRotationToStrC(R: PLTRotation): string;
 begin
-  Result := FormatFloat('0.000000', R^.x) + ' ' +
-           FormatFloat('0.000000', R^.y) + ' ' +
-           FormatFloat('0.000000', R^.z) + ' ' +
-            FormatFloat('0.000000', R^.w);
+  Result := FormatFloatSafe('0.000000', R^.x) + ' ' +
+           FormatFloatSafe('0.000000', R^.y) + ' ' +
+           FormatFloatSafe('0.000000', R^.z) + ' ' +
+            FormatFloatSafe('0.000000', R^.w);
 end;
 
 function UVToStrC(U: PUVPair): string;
 begin
-  Result := FormatFloat('0.000000', U^.a) + ' ' +
-           FormatFloat('0.000000', U^.b);
+  Result := FormatFloatSafe('0.000000', U^.a) + ' ' +
+           FormatFloatSafe('0.000000', U^.b);
 end;
 
 function FlagsToBool(dwFlags: Cardinal; dwWhat: Cardinal; bUseNot: Boolean): Byte;

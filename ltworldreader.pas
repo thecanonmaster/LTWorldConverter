@@ -22,6 +22,7 @@ type
     WorldTree: TLTWorldTree;
     WorldModelList: TWorldModelList;
     WorldLMAnimList: TWorldLMAnimList;
+    WorldExtentsSH: TWorldExtentsSH;
 
     // other
     m_szFilename: string;
@@ -96,17 +97,17 @@ begin
   m_pMemoryStream.Read(nLen, 4);
   SetLength(WorldProperties, nLen);
   if nLen > 0 then m_pMemoryStream.Read(WorldProperties[1], nLen);
-  m_pMemoryStream.Read(WorldExtents.fLMGridSize, 4);
+  {m_pMemoryStream.Read(WorldExtents.fLMGridSize, 4);
   m_pMemoryStream.Read(WorldExtents.vExtentsMin, sizeof(LTVector));
   m_pMemoryStream.Read(WorldExtents.vExtentsMax, sizeof(LTVector));
-  //m_pMemoryStream.Read(WorldExtents.vOffset, sizeof(LTVector));
+  m_pMemoryStream.Read(WorldExtents.vOffset, sizeof(LTVector)); }
   // now log it!
   WLogStr('---- WorldProperties and WorldExtents:');
   WLogStr('| Properties = ' + WorldProperties);
-  WLogReal('LMGridSize', WorldExtents.fLMGridSize);
+  {WLogReal('LMGridSize', WorldExtents.fLMGridSize);
   WLogVec('ExtentsMin', @WorldExtents.vExtentsMin);
   WLogVec('ExtentsMax', @WorldExtents.vExtentsMax);
-  WLogVec('Offset', @WorldExtents.vOffset);
+  WLogVec('Offset', @WorldExtents.vOffset);  }
   WLogStr('-----------------------------------');
 end;
 
@@ -114,7 +115,8 @@ procedure TLTWorldReader.ReadHeader;
 begin
   m_pMemoryStream.Read(WorldHeader.nVersion, 4);
   m_pMemoryStream.Read(WorldHeader.dwObjectDataPos, 4);
-  m_pMemoryStream.Read(WorldHeader.dwRenderDataPos, 4);
+  m_pMemoryStream.Read(WorldHeader.dwBspDataPos, 4);
+  {m_pMemoryStream.Read(WorldHeader.dwRenderDataPos, 4);
   m_pMemoryStream.Read(WorldHeader.dwDummy1, 4);
   m_pMemoryStream.Read(WorldHeader.dwDummy2, 4);
   m_pMemoryStream.Read(WorldHeader.dwDummy3, 4);
@@ -122,12 +124,13 @@ begin
   m_pMemoryStream.Read(WorldHeader.dwDummy5, 4);
   m_pMemoryStream.Read(WorldHeader.dwDummy6, 4);
   m_pMemoryStream.Read(WorldHeader.dwDummy7, 4);
-  m_pMemoryStream.Read(WorldHeader.dwDummy8, 4);
+  m_pMemoryStream.Read(WorldHeader.dwDummy8, 4); }
   // now log it!
   WLogStr('---- WorldHeader:');
   WLogInt('Version', WorldHeader.nVersion);
   WLogAddr('ObjectDataPos', WorldHeader.dwObjectDataPos);
-  WLogAddr('RenderDataPos', WorldHeader.dwRenderDataPos);
+  WLogAddr('BspDataPos', WorldHeader.dwBspDataPos);
+  {WLogAddr('RenderDataPos', WorldHeader.dwRenderDataPos);
   WLogAddr('Dummy1', WorldHeader.dwDummy1);
   WLogAddr('Dummy2', WorldHeader.dwDummy2);
   WLogAddr('Dummy3', WorldHeader.dwDummy3);
@@ -135,7 +138,7 @@ begin
   WLogAddr('Dummy5', WorldHeader.dwDummy5);
   WLogAddr('Dummy6', WorldHeader.dwDummy6);
   WLogAddr('Dummy7', WorldHeader.dwDummy7);
-  WLogAddr('Dummy8', WorldHeader.dwDummy8);
+  WLogAddr('Dummy8', WorldHeader.dwDummy8); }
   WLogStr('-----------------------------------');
 end;
 
@@ -157,7 +160,7 @@ begin
     WorldObject.ReadObject(m_pMemoryStream);
     WLogStr('| ' + WorldObject.GetObjectName + '(' + WorldObject.TypeString + ')' + '[' + IntToHex(file_pos, 8) + ']');
     // debug count
-    if WorldObject.TypeString = 'TranslucentWorldModel' then Inc(nWorldModelsNum, 1);
+    //if WorldObject.TypeString = 'TranslucentWorldModel' then Inc(nWorldModelsNum, 1);
     for j := 0 to WorldObject.NumProperties - 1 do
     begin
       WLogStr('| | ' + TLTWorldObjectProperty(WorldObject.PropertyList.Items[j]).PropName +
@@ -217,14 +220,30 @@ var i, j, k, l, nDummy: Cardinal;
     LoadBSPResult: Integer;
 begin
   WLogStr('---- WorldData');
-  m_pMemoryStream.Read(WorldModelList.nNumModels, 4);
-  WLogInt('NumWorldModels', WorldModelList.nNumModels);
-  for i := 0 to WorldModelList.nNumModels - 1 do
+  //m_pMemoryStream.Read(WorldModelList.nNumModels, 4);
+  //WorldModelList.nNumModels := 1;
+  //WLogInt('NumWorldModels', WorldModelList.nNumModels);
+
+  //for i := 0 to WorldModelList.nNumModels - 1 do
+  i := 0;
+  while True do
   begin
+    if i = 1 then
+    begin
+      m_pMemoryStream.Read(WorldModelList.nNumModels, 4);
+      WorldModelList.nNumModels := WorldModelList.nNumModels + 1;
+    end;
+
+    if (i > 0) and (i = WorldModelList.nNumModels) then
+      Break;
+
     nDummy := 0;
     WLogAddr('WorldModel starts', m_pMemoryStream.Position);
     m_pMemoryStream.Read(nDummy, 4);
+
+    //if i = 0 then
     m_pMemoryStream.Read(anDummy{%H-}, $20);
+
     pWorldData := TLTWorldData.Create;
     pWorldData.NextPos := nDummy;
     WorldModelList.pModelList.Add(pWorldData);
@@ -296,7 +315,11 @@ begin
       WLogVec('| | UV[0]', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_fUV1);
       WLogVec('| | UV[1]', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_fUV2);
       WLogVec('| | UV[2]', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_fUV3);
+      WLogVec('| | UnknownVector1', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_vUnknown1);
+      WLogVec('| | UnknownVector2', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_vUnknown2);
+      WLogVec('| | UnknownVector3', @TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_vUnknown3);
       WLogInt('| | TextureIndex', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nTexture);
+      WLogInt('| | Unknown0', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown0);
       WLogInt('| | SurfaceFlags', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags);
       //WLogStr('| | | SurfaceFlagsBin = ' + binStr(TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nFlags, 32));
       WLogInt('| | Unknown1', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nUnknown1);
@@ -309,6 +332,7 @@ begin
       WLogInt('| | TextureFlags', TLTWorldSurface(pWorldBSP.SurfacesList.Items[j]).m_nTextureFlags);
       WLogStr('| | ----------------------------------');
     end;
+
 
     if pWorldBSP.Points > 0 then
     begin
@@ -330,27 +354,29 @@ begin
       if pWorldPoly.HiVerts > 0 then
          WLogStr('| | This poly has additional vertices [' + IntToStr(pWorldPoly.HiVerts) + ']');
 
-      WLogVec('| | Center', @pWorldPoly.Center);
+      //WLogVec('| | Center', @pWorldPoly.Center);
       //WLogReal('| | Radius', pWorldPoly.Radius);
-      WLogInt('| | LightmapWidth', pWorldPoly.LightmapWidth);
-      WLogInt('| | LightmapHeight', pWorldPoly.LightmapHeight);
-      WLogInt('| | UnknownNum', pWorldPoly.UnknownNum);
+      WLogInt('| | LightmapWidth?', pWorldPoly.LightmapWidth);
+      WLogInt('| | LightmapHeight?', pWorldPoly.LightmapHeight);
+      //WLogInt('| | UnknownNum', pWorldPoly.UnknownNum);
 
       szDump := '';
 
-      if pWorldPoly.UnknownNum > 0 then
+      {if pWorldPoly.UnknownNum > 0 then
       for k := 0 to pWorldPoly.UnknownNum - 1 do
       begin
         szDump := szDump + ' [' + IntToStr(pWorldPoly.UnknownList[k]) + ', ' + IntToStr(pWorldPoly.UnknownList[k+1]) + ']';
       end;
-      WLogStr('| | | UnknownDump =' + szDump);
+      WLogStr('| | | UnknownDump =' + szDump);}
 
+      WLogInt('| | UnknownCardinal1', pWorldPoly.UnknownCardinal1);
+      WLogInt('| | UnknownCardinal2', pWorldPoly.UnknownCardinal2);
       WLogInt('| | SurfaceIndex', pWorldPoly.Surface);
-      WLogInt('| | PlaneIndex', pWorldPoly.Plane);
+      //WLogInt('| | PlaneIndex', pWorldPoly.Plane);
 
-      WLogVec('| | UV[0]', @pWorldPoly.UVData1);
-      WLogVec('| | UV[1]', @pWorldPoly.UVData2);
-      WLogVec('| | UV[2]', @pWorldPoly.UVData3);
+      //WLogVec('| | UV[0]', @pWorldPoly.UVData1);
+      //WLogVec('| | UV[1]', @pWorldPoly.UVData2);
+      //WLogVec('| | UV[2]', @pWorldPoly.UVData3);
 
       WLogInt('| | LoVerts', pWorldPoly.LoVerts);
       WLogInt('| | HiVerts', pWorldPoly.HiVerts);
@@ -375,14 +401,19 @@ begin
         WLogStr('| | Node #' + IntToStr(j))
       else
         WLogStr('| | RootNode');
-      WLogInt('| | Flags', pWorldNode.Flags);
-      WLogInt('| | PlaneType', pWorldNode.PlaneType);
+      //WLogInt('| | Flags', pWorldNode.Flags);
+      //WLogInt('| | PlaneType', pWorldNode.PlaneType);
+      WLogInt('| | UnknownCardinal1', pWorldNode.UnknownCardinal1);
       WLogInt('| | PolyIndex', pWorldNode.Poly);
       WLogInt('| | LeafIndex', pWorldNode.Leaf);
       WLogInt('| | Sides[0]', pWorldNode.Sides[0]);
       WLogInt('| | Sides[1]', pWorldNode.Sides[1]);
       WLogInt('| | SidesStatus[0]', pWorldNode.SidesStatus[0]);
       WLogInt('| | SidesStatus[1]', pWorldNode.SidesStatus[1]);
+      WLogReal('| | UnknownFloat1', pWorldNode.UnknownFloat1);
+      WLogReal('| | UnknownFloat2', pWorldNode.UnknownFloat2);
+      WLogReal('| | UnknownFloat3', pWorldNode.UnknownFloat3);
+      WLogReal('| | UnknownFloat4', pWorldNode.UnknownFloat4);
       WLogStr('| | ----------------------------------');
     end;
 
@@ -424,7 +455,7 @@ begin
         end;
       end;
       WLogStr('| | | Polies =' + szDump);
-      WLogInt('| | Cardinal1', pLeaf.m_nCardinal1);
+      WLogReal('| | Float1', pLeaf.m_fFloat1);
       WLogStr('| | ----------------------------------');
     end;
 
@@ -435,7 +466,7 @@ begin
       WLogStr('| | UserPortal #' + IntToStr(j));
       WLogStr('| | | Name = ' + pUserPortal.m_szName);
       WLogInt('| | Cardinal1', pUserPortal.m_nCardinal1);
-      WLogInt('| | Cardinal2', pUserPortal.m_nCardinal2);
+      //WLogInt('| | Cardinal2', pUserPortal.m_nCardinal2);
       WLogInt('| | Word1', pUserPortal.m_nWord1);
       WLogVec('| | Center', @pUserPortal.m_vCenter);
       WLogVec('| | Dims', @pUserPortal.m_vDims);
@@ -483,11 +514,22 @@ begin
     WLogVec('| | Vector2', @pWorldBSP.UnknownStruct.v2); }
 
     WLogStr('| ----------------------------------');
+
     m_pMemoryStream.Position := pWorldData.NextPos;
+    i := i + 1;
   end;
 
+  g_nGlobalLogIndex := LOG_WORLD_TREE;
+  m_pMemoryStream.Read(WorldExtentsSH.vBoxMin, 12);
+  m_pMemoryStream.Read(WorldExtentsSH.vBoxMax, 12);
+
+  WLogStr('| ---- WorldExtents');
+  WLogVec('| BoxMin', @WorldExtentsSH.vBoxMin);
+  WLogVec('| BoxMax', @WorldExtentsSH.vBoxMax);
+  WLogStr('| ----------------------------------');
+
   WLogStr('-----------------------------------');
-  //WLogStr('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
+  WriteLn('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
 end;
 
 procedure TLTWorldReader.ReadRenderData(bSave: Boolean);
@@ -893,12 +935,11 @@ begin
   g_nGlobalLogIndex := LOG_HEADER;
   ReadHeader;
   ReadPropertiesAndExtents;
-  g_nGlobalLogIndex := LOG_WORLD_TREE;
-  ReadWorldTree;
+  //g_nGlobalLogIndex := LOG_WORLD_TREE;
+  //ReadWorldTree;
+  m_pMemoryStream.Position := WorldHeader.dwBspDataPos;
   g_nGlobalLogIndex := LOG_WORLD_MODELS;
   ReadWorldModels;
-  // test
-  //m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
 
   m_pMemoryStream.Position := WorldHeader.dwObjectDataPos;
   g_nGlobalLogIndex := LOG_OBJECTS;
