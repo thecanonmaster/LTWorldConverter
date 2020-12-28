@@ -24,14 +24,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="-f 01_AMBUSH.DAT -g poly"/>
+        <CommandLineParams Value="-f MYBOX.dat -g poly -l save"/>
         <Display Value=""/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="-f 01_AMBUSH.DAT -g poly"/>
+            <CommandLineParams Value="-f MYBOX.dat -g poly -l save"/>
             <Display Value=""/>
           </local>
         </Mode0>

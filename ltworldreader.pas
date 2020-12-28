@@ -36,6 +36,7 @@ type
     procedure ReadObjects;
     procedure ReadWorldModels;
     procedure ReadRenderData(bSave: Boolean);
+    procedure ReadRenderDataSH(bSave: Boolean);
 
     procedure WriteRenderData;
 
@@ -356,8 +357,8 @@ begin
 
       //WLogVec('| | Center', @pWorldPoly.Center);
       //WLogReal('| | Radius', pWorldPoly.Radius);
-      WLogInt('| | LightmapWidth?', pWorldPoly.LightmapWidth);
-      WLogInt('| | LightmapHeight?', pWorldPoly.LightmapHeight);
+      WLogInt('| | UnknownWord1', pWorldPoly.LightmapWidth);
+      WLogInt('| | UnknownWord2', pWorldPoly.LightmapHeight);
       //WLogInt('| | UnknownNum', pWorldPoly.UnknownNum);
 
       szDump := '';
@@ -513,7 +514,10 @@ begin
     WLogVec('| | Vector1', @pWorldBSP.UnknownStruct.v1);
     WLogVec('| | Vector2', @pWorldBSP.UnknownStruct.v2); }
 
+    pWorldData.RenderDataPos := m_pMemoryStream.Position;
+    WLogInt('| RenderDataPos', pWorldData.RenderDataPos);
     WLogStr('| ----------------------------------');
+
 
     m_pMemoryStream.Position := pWorldData.NextPos;
     i := i + 1;
@@ -529,7 +533,120 @@ begin
   WLogStr('| ----------------------------------');
 
   WLogStr('-----------------------------------');
-  WriteLn('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
+  //WriteLn('ReadPos: ' + IntToHex(m_pMemoryStream.Position, 8));
+end;
+
+procedure TLTWorldReader.ReadRenderDataSH(bSave: Boolean);
+var
+  slAnimList: TStringList;
+  i, j: Cardinal;
+  pWorldData: TLTWorldData;
+  pWorldBsp: TLTWorldBsp;
+  pPoly: TLTWorldPoly;
+  pSurface: TLTWorldSurface;
+  szNiceName: string;
+  pAnim: TLMAnimSH;
+  pPolyData: TLMPolyDataSH;
+  bLightmapped: Boolean;
+begin
+  slAnimList := TStringList.Create;
+  WLogStr('---- RenderData');
+
+  WorldLMAnimList.nNumLMAnims := WorldModelList.nNumModels;
+
+  for i := 0 to WorldLMAnimList.nNumLMAnims - 1 do
+  begin
+
+    pWorldData := TLTWorldData(WorldModelList.pModelList.Items[i]);
+    pWorldBsp := pWorldData.OriginalBSP;
+
+    if pWorldBsp.WorldName = '' then
+      szNiceName := 'null'
+    else
+      szNiceName := pWorldBsp.WorldName;
+
+    if g_bLMFramesToSeparateTGA then
+    begin
+      CreateDir(CPData.DumpsDir + CPData.Sep + szNiceName)
+    end;
+
+    m_pMemoryStream.Position := pWorldData.RenderDataPos;
+    WLogAddr('LMAnim starts', m_pMemoryStream.Position);
+    WriteLn('--- Reading LA: ', szNiceName);
+
+    pAnim := TLMAnimSH.Create;
+    pAnim.Name := szNiceName;
+    m_pMemoryStream.Read(pAnim.m_nUnknown1, 4);
+
+    WLogStr('| ' + szNiceName);
+    WLogInt('| UnknownCardinal1', pAnim.m_nUnknown1);
+
+    for j := 0 to pWorldBsp.Polies - 1 do
+    begin
+      pPolyData := TLMPolyDataSH.Create;
+      m_pMemoryStream.Read(pPolyData.m_vUnknown, SizeOf(LTVector));
+      pAnim.PolyDataList.Add(pPolyData);
+      WLogStr('| | Poly #' + IntToStr(j) + ' Unknown = ' + LTVectorToStrC(@pPolyData.m_vUnknown));
+    end;
+
+    m_pMemoryStream.Read(pAnim.m_nUnknown2, 4);
+    WLogInt('| UnknownCardinal2', pAnim.m_nUnknown2);
+
+    for j := 0 to pWorldBsp.Polies - 1 do
+    begin
+      pPoly := TLTWorldPoly(pWorldBsp.PoliesList.Items[j]);
+      pSurface := TLTWorldSurface(pWorldBsp.SurfacesList.Items[pPoly.Surface]);
+      pPolyData := TLMPolyDataSH(pAnim.PolyDataList.Items[j]);
+
+      bLightmapped := ((pSurface.m_nFlags and SURF_LIGHTMAP) > 0);
+
+      WLogStr('| | Lightmap #' + IntToStr(j));
+
+      if bLightmapped then
+      begin
+        m_pMemoryStream.Read(pPolyData.m_nLMWidth, 1);
+        m_pMemoryStream.Read(pPolyData.m_nLMHeight, 1);
+
+        pPolyData.m_nLMSize := pPolyData.m_nLMWidth * pPolyData.m_nLMHeight * 2;
+        SetLength(pPolyData.m_anLMData, pPolyData.m_nLMSize);
+
+        if pPolyData.m_nLMSize > 0 then
+        begin
+          m_pMemoryStream.Read(pPolyData.m_anLMData[0], pPolyData.m_nLMSize);
+
+          if bSave and g_bLMFramesToSeparateTGA then
+            SaveArrayToTGA(pPolyData.m_anLMData, pPolyData.m_nLMWidth, pPolyData.m_nLMHeight, CPData.DumpsDir + CPData.Sep + szNiceName + CPData.Sep + pWorldBsp.WorldName + '_' + IntToStr(j) + '.tga', 4, True, False);
+        end
+        else
+        begin
+          WLogStrWarn('Poly is flagged as lightmapped but lightmap size is zero!');
+        end;
+
+      end;
+
+      WLogStr('| | | Flag = ' + BoolToStr(bLightmapped, True));
+      WLogStr('| | | Dims = ' + Format('%d x %d', [pPolyData.m_nLMWidth, pPolyData.m_nLMHeight]));
+      WLogStr('| | | Size = ' + IntToStr(pPolyData.m_nLMSize));
+      WLogStr('| | | Data = ' + DynArray_Sha1Hash(pPolyData.m_anLMData, pPolyData.m_nLMSize));
+
+      if (not bLightmapped) and (pPolyData.m_nLMSize > 0) then
+        WLogStrWarn('Poly is not flagged as lightmapped but lightmap is present!');
+
+      WLogStr('| ----------------------------------');
+
+    end;
+
+    WorldLMAnimList.pLMAnimList.Add(pAnim);
+    slAnimList.Add(pWorldBsp.WorldName);
+    if bSave then
+      pAnim.SaveOnDisk;
+    //Exit;
+  end;
+
+
+  WLogStr('----------------------------------');
+  slAnimList.SaveToFile(CPData.DumpsDir + CPData.Sep + 'LightAnimList.txt');
+  slAnimList.Free;
 end;
 
 procedure TLTWorldReader.ReadRenderData(bSave: Boolean);
@@ -733,7 +850,8 @@ begin
 
                 for n := 0 to pPolyData.m_nVertices - 1 do
                   m_pMemoryStream.Read(pPolyData.m_anData[n * 3 + 2], 1); // B
-
+                                                                         if bSave then
+        pAnim.SaveBatchesOnDisk;
                 // Red
                 {for n := 0 to pPolyData.m_nVertices - 1 do
                 begin
@@ -945,20 +1063,20 @@ begin
   g_nGlobalLogIndex := LOG_OBJECTS;
   ReadObjects;
   g_nGlobalLogIndex := LOG_RENDER_DATA;
-  m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
+  //m_pMemoryStream.Position := WorldHeader.dwRenderDataPos;
   if g_szLightAnimsJob = 'save' then
   begin
-    ReadRenderData(True);
+    ReadRenderDataSH(True);
   end
   else if g_szLightAnimsJob = 'read' then
   begin
-    ReadRenderData(False);
-  end
-  else if g_szLightAnimsJob = 'load' then
+    ReadRenderDataSH(False);
+  end;
+  {else if g_szLightAnimsJob = 'load' then
   begin
     m_pMemoryStream.SetSize(WorldHeader.dwRenderDataPos + 16);
     WriteRenderData;
-  end;
+  end;  }
   g_nGlobalLogIndex := LOG_GENERIC;
 end;
 

@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, MyLogger, MyCrossPlatform, ltworldtypes, sha1;
 
 const
-  LTWC_VERSION = 'v0.126 alpha';
+  LTWC_VERSION = 'v0.100 alpha';
 
 type
   TDynByteArray = array of Byte;
@@ -46,6 +46,7 @@ procedure SaveArrayToTGA(Buffer: TDynByteArray; nWidth: Word; nHeight: Word; szF
 function LoadArrayFromTGA(var Buffer: TDynByteArray; var nWidth: Word; var nHeight: Word; szFilename: string; var nChannels: Byte; bZeroAlpha: Boolean; bSwapRB: Boolean): Cardinal;
 procedure DynArray_MemSet32(Buffer: TDynCardinalArray; nPosition: Cardinal; nValue: Cardinal; nCount: Cardinal);
 procedure SimpleBlt32(Dest: TDynCardinalArray; Source: TDynCardinalArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
+procedure SimpleBlt16(Dest: TDynWordArray; Source: TDynWordArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
 procedure SimpleReverseBlt32(Source: TDynCardinalArray; Dest: TDynCardinalArray; nSourceWidth: Word; nDestWidth: Word; nDestHeight: Word; nX: Word; nY: Word);
 function CompareDynArrays(anLeft: TDynByteArray; anRight: TDynByteArray; nLength: Cardinal): Integer;
 function DynArray_Sha1Hash(Source: TDynByteArray; nLength: Cardinal): string;
@@ -130,6 +131,8 @@ procedure SaveArrayToTGA(Buffer: TDynByteArray; nWidth: Word; nHeight: Word; szF
 var MS: TMemoryStream;
     anHeader: array[0..17] of Byte = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
     i, nSize: Cardinal;
+    r5, g6, b5: Byte;
+    nColorWord, nTemp: Word;
 begin
   anHeader[2] := 2; // TrueColor
   PWord(@anHeader[12])^ := nWidth; // 12 - 13
@@ -140,25 +143,59 @@ begin
   else
     anHeader[17] := 0; // Dunno
 
-  nSize := nWidth * nHeight * nChannels;
+  nSize := nWidth * nHeight * 2; //nChannels;
 
   MS := TMemoryStream.Create;
   MS.Write(anHeader[0], 18);
 
+  //red8bit   = (red5bit << 3) | (red5bit >> 2);
+  //green8bit = (green6bit << 2) | (green6bit >> 4);
+  //blue8bit  = (blue5bit << 3) | (blue5bit >> 2);
+
+
   i := 0;
   while i < nSize do
   begin
+
+    nColorWord := PWord(@Buffer[i])^;
+
+    {$ASMMODE intel}
+    asm
+      mov ax, nColorWord
+      shr ax, 11
+      mov r5, al;
+      mov ax, nColorWord
+      shl ax, 5
+      shr ax, 10
+      mov g6, al;
+      mov ax, nColorWord
+      shl ax, 11
+      shr ax, 11
+      mov b5, al;
+    end;
+
+{red8bit   = (red5bit << 3) | (red5bit >> 2);
+green8bit = (green6bit << 2) | (green6bit >> 4);
+blue8bit  = (blue5bit << 3) | (blue5bit >> 2); }
+
+
     if bSwapRB then
     begin
-      MS.WriteByte(Buffer[i + 0]); // R
+      {MS.WriteByte(Buffer[i + 0]); // R
       MS.WriteByte(Buffer[i + 1]); // G
-      MS.WriteByte(Buffer[i + 2]); // B
+      MS.WriteByte(Buffer[i + 2]); // B   }
+      MS.WriteByte((r5 shl 3) or (r5 shr 2));
+      MS.WriteByte((g6 shl 2) or (g6 shr 4));
+      MS.WriteByte((b5 shl 3) or (b5 shr 2));
     end
     else
     begin
-      MS.WriteByte(Buffer[i + 2]); // B
+      {MS.WriteByte(Buffer[i + 2]); // B
       MS.WriteByte(Buffer[i + 1]); // G
-      MS.WriteByte(Buffer[i + 0]); // R
+      MS.WriteByte(Buffer[i + 0]); // R}
+      MS.WriteByte((b5 shl 3) or (b5 shr 2));
+      MS.WriteByte((g6 shl 2) or (g6 shr 4));
+      MS.WriteByte((r5 shl 3) or (r5 shr 2));
     end;
 
     if nChannels = 4 then
@@ -169,7 +206,8 @@ begin
         MS.WriteByte($FF);
     end;
 
-    Inc(i, nChannels);
+    //Inc(i, nChannels);
+    Inc(i, 2);
   end;
 
   MS.SaveToFile(szFilename);
@@ -226,6 +264,15 @@ begin
   for i := 0 to nSourceHeight - 1 do
   begin
     Move(Source[i * nSourceWidth], Dest[(nY * nDestWidth + nX) + (nDestWidth * i)], nSourceWidth * 4);
+  end;
+end;
+
+procedure SimpleBlt16(Dest: TDynWordArray; Source: TDynWordArray; nDestWidth: Word; nSourceWidth: Word; nSourceHeight: Word; nX: Word; nY: Word);
+var i: Word;
+begin
+  for i := 0 to nSourceHeight - 1 do
+  begin
+    Move(Source[i * nSourceWidth], Dest[(nY * nDestWidth + nX) + (nDestWidth * i)], nSourceWidth * 2);
   end;
 end;
 

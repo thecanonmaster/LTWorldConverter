@@ -267,6 +267,7 @@ type
     procedure ReadUserPortals(FS: TMemoryStream);
     procedure ReadPBlockTable(FS: TMemoryStream);
 
+    procedure CopyUVsToPolies;
     procedure SaveNodesDump(S: string);
 
     constructor Create; virtual;
@@ -278,11 +279,13 @@ type
     m_nFlags: Cardinal;
     m_pOriginalBSP: TLTWorldBsp;
     m_nNextPos: Cardinal;
+    m_nRenderDataPos: Cardinal;
   protected
   public
     property Flags: Cardinal read m_nFlags write m_nFlags;
     property OriginalBSP: TLTWorldBsp read m_pOriginalBSP write m_pOriginalBSP;
     property NextPos: Cardinal read m_nNextPos write m_nNextPos;
+    property RenderDataPos: Cardinal read m_nRenderDataPos write m_nRenderDataPos;
     constructor Create; virtual;
     destructor Destroy; override;
   end;
@@ -333,6 +336,40 @@ type
     m_nPolyIndex: Word;
     m_pWorldPoly: TLTWorldPoly;
   end;
+
+  { TLMPolyDataSH }
+
+  TLMPolyDataSH = class(TObject)
+  public
+    m_vUnknown: LTVector;
+    m_nLMWidth: Byte;
+    m_nLMHeight: Byte;
+    m_nLandscapeX: Word;
+    m_nLandscapeY: Word;
+    m_nLMSize: Integer;
+    m_anLMData: TDynByteArray;
+    constructor Create; virtual;
+    destructor Destroy; override;
+  end;
+
+  { TLMAnimSH }
+
+  TLMAnimSH = class(TObject)
+    private
+      m_szName: string;
+      m_pPolyDataList: TFPObjectList;
+      procedure CreateLandscape(var Buffer: TDynByteArray; var nFullWidth: Word;
+        var nFullHeight: Word);
+    public
+      m_nUnknown1: Cardinal;
+      m_nUnknown2: Cardinal;
+      property Name: string read m_szName write m_szName;
+      property PolyDataList: TFPObjectList read m_pPolyDataList write m_pPolyDataList;
+      procedure SaveOnDisk;
+      constructor Create; virtual;
+      destructor Destroy; override;
+  end;
+
 
   { TLMAnim }
 
@@ -402,6 +439,124 @@ function w_NodeForIndex(nListSize: Cardinal; nIndex: Integer; var nStatus: Cardi
 procedure w_SetPlaneTypes(pNodeList: TFPObjectList; pPolyList: TFPObjectList; pPlaneList: TFPObjectList; nNodes: Cardinal; bUsePlaneTypes: Boolean);
 
 implementation
+
+{ TLMPolyDataSH }
+
+constructor TLMPolyDataSH.Create;
+begin
+
+end;
+
+destructor TLMPolyDataSH.Destroy;
+begin
+  SetLength(m_anLMData, 0);
+  inherited Destroy;
+end;
+
+{ TLMAnimSH }
+
+procedure TLMAnimSH.CreateLandscape(var Buffer: TDynByteArray; var nFullWidth: Word; var nFullHeight: Word);
+var i: Cardinal;
+    pData: TLMPolyDataSH;
+    nLineWidth, nLineHeight: Word;
+    nLineCounter: Cardinal = 0;
+    bFinalLine: Boolean = False;
+begin
+  nLineWidth := 0;
+  nLineHeight := 0;
+
+  for i := 0 to m_pPolyDataList.Count - 1 do
+  begin
+    pData := TLMPolyDataSH(m_pPolyDataList.Items[i]);
+
+    if pData.m_nLMSize = 0 then
+      Continue;
+
+    if nLineCounter < LANDSCAPE_LIGHTMAPS_PER_LINE then
+    begin
+      Inc(nLineWidth, pData.m_nLMWidth);
+
+      if pData.m_nLMHeight > nLineHeight then
+        nLineHeight := pData.m_nLMHeight;
+
+      Inc(nLineCounter, 1);
+
+      pData.m_nLandscapeX := nLineWidth - pData.m_nLMWidth;
+      pData.m_nLandscapeY := nFullHeight;
+
+      bFinalLine := True;
+    end
+    else
+    begin
+      Inc(nLineWidth, pData.m_nLMWidth);
+
+      if pData.m_nLMHeight > nLineHeight then
+        nLineHeight := pData.m_nLMHeight;
+
+      pData.m_nLandscapeX := nLineWidth - pData.m_nLMWidth;
+      pData.m_nLandscapeY := nFullHeight;
+
+      if nLineWidth > nFullWidth then
+        nFullWidth := nLineWidth;
+      Inc(nFullHeight, nLineHeight);
+
+      nLineCounter := 0;
+      nLineWidth := 0;
+      nLineHeight := 0;
+
+      bFinalLine := False;
+    end;
+
+  end;
+
+  if bFinalLine then
+  begin
+    if nLineWidth > nFullWidth then
+      nFullWidth := nLineWidth;
+    Inc(nFullHeight, nLineHeight);
+  end;
+
+  SetLength(Buffer, nFullWidth * nFullHeight * 2);
+
+  for i := 0 to m_pPolyDataList.Count - 1 do
+  begin
+    pData := TLMPolyDataSH(m_pPolyDataList.Items[i]);
+
+    if pData.m_nLMSize = 0 then
+      Continue;
+
+    SimpleBlt16(TDynWordArray(Buffer), TDynWordArray(pData.m_anLMData),
+      nFullWidth, pData.m_nLMWidth, pData.m_nLMHeight, pData.m_nLandscapeX, pData.m_nLandscapeY);
+
+  end;
+end;
+
+procedure TLMAnimSH.SaveOnDisk;
+var anBuffer: TDynByteArray;
+    nWidth: Word = 0;
+    nHeight: Word = 0;
+    MS: TMemoryStream;
+begin
+  MS := TMemoryStream.Create;
+
+  CreateLandscape(anBuffer{%H-}, nWidth, nHeight);
+  if nWidth * nHeight > 0 then
+    SaveArrayToTGA(anBuffer, nWidth, nHeight, CPData.DumpsDir + CPData.Sep + m_szName + '.tga', 4, True, False);
+
+  SetLength(anBuffer, 0);
+  MS.Free;
+end;
+
+constructor TLMAnimSH.Create;
+begin
+  m_pPolyDataList := TFPObjectList.Create(True);
+end;
+
+destructor TLMAnimSH.Destroy;
+begin
+  m_pPolyDataList.Free;
+  inherited Destroy;
+end;
 
 { TLTLeaf }
 
@@ -872,7 +1027,6 @@ var dwWorldInfoFlags,
     nNameLen: Word;
     nTemp: TEventType;
     //pVertex: TLTWorldVertex;
-    i: Cardinal;
 begin
   Result := 0;
   dwWorldInfoFlags := 0;
@@ -965,6 +1119,8 @@ begin
 
   ReadPBlockTable(FS);
   ReadRootNode(FS);
+
+  CopyUVsToPolies;
 
   {FS.Read(m_nSections, 4);
   if m_nSections > 0 then
@@ -1147,6 +1303,21 @@ begin
     end;
   end;
 
+end;
+
+procedure TLTWorldBsp.CopyUVsToPolies;
+var i: Cardinal;
+    pPoly: TLTWorldPoly;
+    pSurface: TLTWorldSurface;
+begin
+  for i := 0 to m_nPolies - 1 do
+  begin
+    pPoly := TLTWorldPoly(m_pPolies.Items[i]);
+    pSurface := TLTWorldSurface(m_pSurfaces.Items[pPoly.Surface]);
+    pPoly.UVData1 := pSurface.m_fUV1;
+    pPoly.UVData2 := pSurface.m_fUV2;
+    pPoly.UVData3 := pSurface.m_fUV3;
+  end;
 end;
 
 procedure TLTWorldBsp.SaveNodesDump(S: string);
