@@ -37,3 +37,6 @@ tmp/
 *.bat
 *.dat
 *.lta
+*.ed
+*.bt
+*.txt

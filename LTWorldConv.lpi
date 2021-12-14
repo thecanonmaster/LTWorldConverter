@@ -24,14 +24,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="-f MYBOX.dat -g poly -l save"/>
+        <CommandLineParams Value="-f 03_MUSEUM.DAT -o 0 -l read -g simple -e"/>
         <Display Value=""/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="-f MYBOX.dat -g poly -l save"/>
+            <CommandLineParams Value="-f 03_MUSEUM.DAT -o 0 -l read -g simple -e"/>
             <Display Value=""/>
           </local>
         </Mode0>
@@ -43,40 +43,39 @@
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
-        <Filename Value="mycrossplatform.pas"/>
+        <Filename Value="ltworldtypes.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="MyCrossPlatform"/>
       </Unit1>
       <Unit2>
-        <Filename Value="ltworldtypes.pas"/>
+        <Filename Value="ltworldreader.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit2>
       <Unit3>
-        <Filename Value="ltworldreader.pas"/>
+        <Filename Value="ltworldobject.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit3>
       <Unit4>
-        <Filename Value="ltworldobject.pas"/>
+        <Filename Value="ltworldtree.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit4>
       <Unit5>
-        <Filename Value="ltworldtree.pas"/>
+        <Filename Value="ltworlddata.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit5>
       <Unit6>
-        <Filename Value="ltworlddata.pas"/>
+        <Filename Value="globals.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit6>
       <Unit7>
-        <Filename Value="globals.pas"/>
+        <Filename Value="lightmapcompress.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit7>
       <Unit8>
-        <Filename Value="lightmapcompress.pas"/>
+        <Filename Value="uvtoopq.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
       <Unit9>
-        <Filename Value="uvtoopq.pas"/>
+        <Filename Value="edworldexporter.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit9>
     </Units>

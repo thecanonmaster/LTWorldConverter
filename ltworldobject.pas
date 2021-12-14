@@ -44,8 +44,19 @@ type
 
     property PropCode: Byte read m_nPropCode write m_nPropCode;
     property PropName: string read m_szName write m_szName;
+    property PropFlags: Cardinal read m_nPropFlags write m_nPropFlags;
+    property PropDataLength: Word read m_nPropDataLength write m_nPropDataLength;
+
     procedure ReadProperty(FS: TMemoryStream);
     procedure WriteProperty(nCode: Byte; szName: string; pData: Pointer);
+
+    constructor CreateStr(strName: string; dwPropFlags: Cardinal; pstrData: PString = nil); virtual;
+    constructor CreateVec(strName: string; dwPropFlags: Cardinal; pvData: PLTVector = nil); virtual;
+    constructor CreateReal(strName: string; dwPropFlags: Cardinal; pfData: PLTFloat = nil); virtual;
+    constructor CreateBool(strName: string; dwPropFlags: Cardinal; pnData: PByte = nil); virtual;
+    constructor CreateInt(strName: string; dwPropFlags: Cardinal; pdwData: PCardinal = nil); virtual;
+    constructor CreateRot(strName: string; dwPropFlags: Cardinal; prData: PLTRotation = nil); virtual;
+
     constructor Create; virtual;
     destructor Destroy; override;
   end;
@@ -305,6 +316,60 @@ begin
         m_rData := LTRotation(pData^);
       end;
   end;
+end;
+
+constructor TLTWorldObjectProperty.CreateStr(strName: string; dwPropFlags: Cardinal; pstrData: PString);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_STRING;
+  m_nPropFlags := dwPropFlags;
+  if pstrData <> nil then
+    m_szData := pstrData^;
+end;
+
+constructor TLTWorldObjectProperty.CreateVec(strName: string; dwPropFlags: Cardinal; pvData: PLTVector);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_VECTOR;
+  m_nPropFlags := dwPropFlags;
+  if pvData <> nil then
+    m_vData := pvData^;
+end;
+
+constructor TLTWorldObjectProperty.CreateReal(strName: string; dwPropFlags: Cardinal; pfData: PLTFloat);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_REAL;
+  m_nPropFlags := dwPropFlags;
+  if pfData <> nil then
+    m_fData := pfData^;
+end;
+
+constructor TLTWorldObjectProperty.CreateBool(strName: string; dwPropFlags: Cardinal; pnData: PByte);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_BOOL;
+  m_nPropFlags := dwPropFlags;
+  if pnData <> nil then
+    m_nData := pnData^;
+end;
+
+constructor TLTWorldObjectProperty.CreateInt(strName: string; dwPropFlags: Cardinal; pdwData: PCardinal);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_LONGINT;
+  m_nPropFlags := dwPropFlags;
+  if pdwData <> nil then
+    m_dwData := pdwData^;
+end;
+
+constructor TLTWorldObjectProperty.CreateRot(strName: string; dwPropFlags: Cardinal; prData: PLTRotation);
+begin
+  m_szName := strName;
+  m_nPropCode := PT_ROTATION;
+  m_nPropFlags := dwPropFlags;
+  if prData <> nil then
+    m_rData := prData^;
 end;
 
 constructor TLTWorldObjectProperty.Create;

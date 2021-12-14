@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, MyLogger, MyCrossPlatform, ltworldtypes, sha1;
 
 const
-  LTWC_VERSION = 'v0.100 alpha';
+  LTWC_VERSION = 'v0.101 alpha';
 
 type
   TDynByteArray = array of Byte;
@@ -18,10 +18,14 @@ type
 
 var
   Logger: TMyLameLogger;
-  CPData: TMyCrossPlatform;
+  g_szCurDir: string;
+  g_szDumpsDir: string;
+  g_szPathSep: string;
+
   g_szBrushType: string;
   g_szBrushGenType: string;
   g_szGeometrySource: string;
+  g_bConvertToED: Boolean;
   g_bDumpNodes: Boolean;
   //g_bIgnoreObjects: Boolean;
   g_szLightAnimsJob: string;
@@ -30,7 +34,7 @@ var
 
   g_bLMFramesToSeparateTGA: Boolean = False;
   g_bAdditionalTexturesLTA: Boolean = False;
-  g_bLightMapTexturesLTA: Boolean = False;
+  //g_bLightMapTexturesLTA: Boolean = False;
 
 
 function DumpExceptionCallStack(E: Exception): string;

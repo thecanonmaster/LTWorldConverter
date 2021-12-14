@@ -67,7 +67,6 @@ begin
   //FS.Position := FS.Position - 8;
 
   FS.Read(vBoxMin, sizeof(LTVector));
-  // omg!
   FS.Read(vBoxMax, sizeof(LTVector));
   FS.Read(m_nNumNodes, 4);
   FS.Read(nDummyTerrainDepth, 4);

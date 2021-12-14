@@ -104,22 +104,6 @@ type
     dwObjectDataPos: Cardinal;
     dwBspDataPos: Cardinal;
     dwRenderDataPos: Cardinal;
-    // addtional
-    dwDummy1: Cardinal;
-    dwDummy2: Cardinal;
-    dwDummy3: Cardinal;
-    dwDummy4: Cardinal;
-    dwDummy5: Cardinal;
-    dwDummy6: Cardinal;
-    dwDummy7: Cardinal;
-    dwDummy8: Cardinal;
-  end;
-
-  TWorldExtents = record
-    fLMGridSize: LTFloat;
-    vExtentsMin: LTVector;
-    vExtentsMax: LTVector;
-    vOffset: LTVector;
   end;
 
   TWorldObjectList = record
