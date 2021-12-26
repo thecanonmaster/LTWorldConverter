@@ -1,0 +1,17 @@
+################# SHOGO
+Door
+DestructableDoor
+VolumeBrush
+DemoSkyWorldModel
+Electricity
+RotatingDoor
+RotatingWorldModel
+################# BLOOD2
+CDestructableBrush
+Container
+Ladder
+Water
+Blood
+WorldModelDebris
+Conveyor
+Damage
