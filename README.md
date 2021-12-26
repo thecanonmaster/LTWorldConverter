@@ -1,4 +1,4 @@
 # LTWorldConverter
 
-LithTech's DAT to LTA world format converter  
-Version 70 is supported (Aliens vs Predator 2)
+LithTech's DAT to LTA / ED world format converter  
+Version 56 is supported (Blood 2 and Shogo)
